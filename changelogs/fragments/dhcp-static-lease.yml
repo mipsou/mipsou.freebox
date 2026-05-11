@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add new module ``dhcp_static_lease`` — declarative management of Freebox
+    DHCP static lease reservations. Idempotency keyed on MAC address (case
+    insensitive). Supports ``state: present`` (create or update via DELETE+POST
+    since the Freebox API does not expose a PUT on individual leases) and
+    ``state: absent``. Validates the reserved IP is in RFC1918 private space
+    and not in the Freebox-reserved range (``.0``, ``.1``, ``.254``, ``.255``).
+    First v0.2 module — does not affect v0.1 (vm, vm_disk, fs_file).
