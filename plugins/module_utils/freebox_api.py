@@ -10,7 +10,6 @@ __metaclass__ = type
 import base64
 import hashlib
 import hmac
-import ipaddress
 import json
 import re
 import time
@@ -87,11 +86,6 @@ def as_list(value):
 
 
 _MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$")
-_PRIVATE_NETS = (
-    ipaddress.ip_network(u"10.0.0.0/8"),
-    ipaddress.ip_network(u"172.16.0.0/12"),
-    ipaddress.ip_network(u"192.168.0.0/16"),
-)
 
 
 def validate_mac(mac):
@@ -112,19 +106,42 @@ def validate_port(port, name="port"):
     return n
 
 
-def validate_rfc1918(ip):
-    """Ensure ``ip`` is a literal IPv4 in RFC1918 private space. Raises ``ValueError``."""
+def _parse_ipv4(ip):
+    """Return a 4-tuple of octets for a valid IPv4 dotted-decimal address.
+
+    Raises ``ValueError`` for anything else (non-string, wrong segment count,
+    non-numeric segment, out-of-range octet). Implemented without
+    ``ipaddress`` so the module works on Python 2.7 (ansible-test sanity
+    runs import tests on Python 2.7 for stable-2.16).
+    """
     if not isinstance(ip, str):
         raise ValueError("ip must be a string, got %r" % (ip,))
-    try:
-        addr = ipaddress.ip_address(u"" + ip)
-    except ValueError as exc:
-        raise ValueError("invalid IPv4 address %r (%s)" % (ip, exc))
-    if not isinstance(addr, ipaddress.IPv4Address):
-        raise ValueError("expected IPv4, got %r" % (ip,))
-    if not any(addr in net for net in _PRIVATE_NETS):
+    parts = ip.split(".")
+    if len(parts) != 4:
+        raise ValueError("invalid IPv4 address: %r" % (ip,))
+    octets = []
+    for part in parts:
+        if not part.isdigit():
+            raise ValueError("invalid IPv4 address: %r" % (ip,))
+        value = int(part)
+        if not 0 <= value <= 255:
+            raise ValueError("invalid IPv4 address: %r" % (ip,))
+        octets.append(value)
+    return tuple(octets)
+
+
+def validate_rfc1918(ip):
+    """Ensure ``ip`` is a literal IPv4 in RFC1918 private space. Raises ``ValueError``."""
+    octets = _parse_ipv4(ip)
+    a, b = octets[0], octets[1]
+    in_private = (
+        a == 10
+        or (a == 172 and 16 <= b <= 31)
+        or (a == 192 and b == 168)
+    )
+    if not in_private:
         raise ValueError("%s is not in RFC1918 private space" % ip)
-    return str(addr)
+    return "%d.%d.%d.%d" % octets
 
 
 def validate_dhcp_ip(ip):

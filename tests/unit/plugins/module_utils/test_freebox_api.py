@@ -414,7 +414,7 @@ def test_diff_and_put_full_body_sends_merged_dict(client):
         (200, _envelope(result={"name": "vm1", "memory": 1024, "vcpus": 2})),
         (200, _envelope(result={"name": "vm1", "memory": 2048, "vcpus": 2})),
     ])
-    changed, _, _ = client.diff_and_put(
+    changed, _before, _after = client.diff_and_put(
         "/vm/42", {"memory": 2048}, full_body=True
     )
     assert changed is True

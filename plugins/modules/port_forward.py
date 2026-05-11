@@ -77,6 +77,8 @@ options:
     type: str
     choices: [present, absent]
     default: present
+author:
+  - Mipsou (@mipsou)
 """
 
 EXAMPLES = r"""

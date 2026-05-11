@@ -46,6 +46,8 @@ options:
       - Whether the Freebox built-in ad-blocking is enabled at the
         connection level.
     type: bool
+author:
+  - Mipsou (@mipsou)
 """
 
 EXAMPLES = r"""

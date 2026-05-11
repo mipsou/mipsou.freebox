@@ -53,6 +53,8 @@ options:
         Freebox default DNS.
     type: list
     elements: str
+author:
+  - Mipsou (@mipsou)
 """
 
 EXAMPLES = r"""
