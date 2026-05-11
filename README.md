@@ -1,5 +1,8 @@
 # Ansible Collection — `mipsou.freebox`
 
+[![CI](https://github.com/mipsou/mipsou.freebox/actions/workflows/ci.yml/badge.svg)](https://github.com/mipsou/mipsou.freebox/actions/workflows/ci.yml)
+[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://joinup.ec.europa.eu/page/eupl-text-11-12)
+
 Declarative, idempotent management of a Freebox (Free.fr ISP CPE) via its HTTP
 API. Built for PRA / disaster-recovery workflows and homelab infra-as-code.
 
