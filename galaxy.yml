@@ -30,4 +30,5 @@ build_ignore:
   - dist
   - HANDOFF.md
   - PROPOSAL.md
+  - AUDIT.md
   - '*.tar.gz'

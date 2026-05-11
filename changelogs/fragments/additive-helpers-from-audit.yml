@@ -1,0 +1,23 @@
+---
+minor_changes:
+  - >-
+    ``module_utils.freebox_api``: add ``as_list()`` tolerant deserializer that
+    coerces Freebox firmware sentinels (``None``, ``""``, ``{}``, single
+    object) into a list. Required for fields like ``BindUSBPorts`` (vm),
+    DHCP ``options`` (dhcpconfig), and ``l2ident`` (lan) where the firmware
+    returns inconsistent shapes.
+  - >-
+    ``module_utils.freebox_api``: add defensive validators ``validate_mac``,
+    ``validate_port``, ``validate_rfc1918``, ``validate_dhcp_ip`` (rejects
+    .0/.1/.254/.255 Freebox-reserved), ``validate_secureon_password``, and
+    ``validate_disk_name``. These mirror the validations freebox-mcp performs
+    client-side; the Freebox API itself does not enforce them.
+  - >-
+    ``FreeboxClient.diff_and_put(path, desired, full_body=False,
+    check_mode=False)``: read-modify-write helper for idempotent config
+    endpoints. Returns ``(changed, before, after)``. ``full_body=True`` for
+    endpoints that reject partial PUT (e.g. ``/vm/{id}``); default sends only
+    the changed keys. Honours ``check_mode`` without issuing the PUT.
+  - >-
+    None of the v0.1 modules (vm, vm_disk, fs_file) are modified — these
+    helpers are purely additive groundwork for v0.2+ modules.

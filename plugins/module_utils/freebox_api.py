@@ -11,6 +11,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import time
 
 from ansible.module_utils.six.moves.urllib.parse import quote
@@ -67,6 +68,117 @@ def encode_path(path):
 def decode_path(encoded):
     """Inverse of :func:`encode_path`."""
     return base64.b64decode(encoded.encode("ascii")).decode("utf-8")
+
+
+def as_list(value):
+    """Coerce a Freebox-OS field that may be ``None``, ``""``, ``{}``, a single
+    object, or a list, into a Python list.
+
+    The Freebox firmware returns sentinel values like ``""`` for empty
+    ``BindUSBPorts`` (vm), ``{}`` for empty DHCP ``options`` (dhcpconfig), or a
+    single object instead of a single-element list (``l2ident`` on lan).
+    """
+    if value is None or value == "" or value == {}:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+_MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$")
+
+
+def validate_mac(mac):
+    """Return canonical MAC (lowercase, colon-separated). Raises ``ValueError``."""
+    if not isinstance(mac, str) or not _MAC_RE.match(mac):
+        raise ValueError("invalid MAC format: %r" % (mac,))
+    return mac.replace("-", ":").lower()
+
+
+def validate_port(port, name="port"):
+    """Ensure ``1 <= port <= 65535``. Returns int. Raises ``ValueError``."""
+    try:
+        n = int(port)
+    except (TypeError, ValueError):
+        raise ValueError("%s must be an integer, got %r" % (name, port))
+    if not 1 <= n <= 65535:
+        raise ValueError("%s must be in 1..65535, got %d" % (name, n))
+    return n
+
+
+def _parse_ipv4(ip):
+    """Return a 4-tuple of octets for a valid IPv4 dotted-decimal address.
+
+    Raises ``ValueError`` for anything else (non-string, wrong segment count,
+    non-numeric segment, out-of-range octet). Implemented without
+    ``ipaddress`` so the module works on Python 2.7 (ansible-test sanity
+    runs import tests on Python 2.7 for stable-2.16).
+    """
+    if not isinstance(ip, str):
+        raise ValueError("ip must be a string, got %r" % (ip,))
+    parts = ip.split(".")
+    if len(parts) != 4:
+        raise ValueError("invalid IPv4 address: %r" % (ip,))
+    octets = []
+    for part in parts:
+        if not part.isdigit():
+            raise ValueError("invalid IPv4 address: %r" % (ip,))
+        value = int(part)
+        if not 0 <= value <= 255:
+            raise ValueError("invalid IPv4 address: %r" % (ip,))
+        octets.append(value)
+    return tuple(octets)
+
+
+def validate_rfc1918(ip):
+    """Ensure ``ip`` is a literal IPv4 in RFC1918 private space. Raises ``ValueError``."""
+    octets = _parse_ipv4(ip)
+    a, b = octets[0], octets[1]
+    in_private = (
+        a == 10
+        or (a == 172 and 16 <= b <= 31)
+        or (a == 192 and b == 168)
+    )
+    if not in_private:
+        raise ValueError("%s is not in RFC1918 private space" % ip)
+    return ".".join(str(o) for o in octets)
+
+
+def validate_dhcp_ip(ip):
+    """Like :func:`validate_rfc1918` but also rejects ``.0``, ``.1``, ``.254``,
+    ``.255`` (Freebox-reserved gateway / broadcast / network addresses)."""
+    canonical = validate_rfc1918(ip)
+    last_octet = int(canonical.rsplit(".", 1)[1])
+    if last_octet in (0, 1, 254, 255):
+        raise ValueError(
+            "DHCP IP cannot end in .%d (Freebox-reserved); got %s"
+            % (last_octet, canonical)
+        )
+    return canonical
+
+
+def validate_secureon_password(password):
+    """SecureOn WoL password is MAC-formatted (6-octet hex). Raises ``ValueError``."""
+    if not isinstance(password, str) or not _MAC_RE.match(password):
+        raise ValueError(
+            "invalid SecureOn password (expected 6-octet hex like a MAC), got %r"
+            % (password,)
+        )
+    return password.replace("-", ":").lower()
+
+
+def validate_disk_name(name):
+    """Reject path separators / traversal and require ``.qcow2`` or ``.raw`` extension."""
+    if not isinstance(name, str) or not name:
+        raise ValueError("disk_name must be a non-empty string")
+    if "/" in name or "\\" in name or ".." in name:
+        raise ValueError(
+            "disk_name must not contain path separators or '..': %r" % (name,)
+        )
+    lower = name.lower()
+    if not (lower.endswith(".qcow2") or lower.endswith(".raw")):
+        raise ValueError("disk_name must end with .qcow2 or .raw (got %r)" % (name,))
+    return name
 
 
 def sanitize_path(path):
@@ -329,3 +441,34 @@ class FreeboxClient(object):
         except FreeboxAPIError:
             # Task may already be gone — non-fatal.
             pass
+
+    def diff_and_put(self, path, desired, full_body=False, check_mode=False):
+        """Read-modify-write helper for idempotent config endpoints.
+
+        Performs ``GET path`` and compares each key of ``desired`` against the
+        current state. Returns ``(changed, before, after)`` where ``changed``
+        is True iff at least one key in ``desired`` differs from the current
+        value.
+
+        - When ``full_body=True``, the PUT body is the merged ``current+desired``
+          dict — required for endpoints that reject partial PUT (e.g.
+          ``/vm/{id}`` returns ``invalid_request`` if any field is missing).
+        - When ``full_body=False`` (default), only the changed keys are sent
+          as a partial PUT.
+        - When ``check_mode=True``, no PUT is issued and ``after`` is computed
+          locally as ``current+desired``.
+
+        For PUT endpoints that return an empty/None body, ``after`` falls back
+        to the locally merged dict.
+        """
+        before = self.get(path) or {}
+        changed_keys = [k for k, v in desired.items() if before.get(k) != v]
+        if not changed_keys:
+            return False, before, before
+        after_simulated = dict(before)
+        after_simulated.update(desired)
+        if check_mode:
+            return True, before, after_simulated
+        body = after_simulated if full_body else {k: desired[k] for k in changed_keys}
+        after_actual = self.put(path, body=body) or after_simulated
+        return True, before, after_actual
