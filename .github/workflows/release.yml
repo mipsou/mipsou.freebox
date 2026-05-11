@@ -72,8 +72,8 @@ jobs:
         run: |
           set -e
           if [ -z "$GALAXY_API_KEY" ]; then
-            echo "::error::Secret GALAXY_API_KEY is not set on this repository."
-            exit 1
+            echo "::warning::Secret GALAXY_API_KEY is not set on this repository — skipping Galaxy publish. The release tarball is still attached to the GitHub Release; set the secret and rerun this workflow to publish."
+            exit 0
           fi
           tarball=$(ls dist/mipsou-freebox-*.tar.gz | head -1)
           echo "Publishing $tarball …"
