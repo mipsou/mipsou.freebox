@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2026 Mipsou <chpujol@gmail.com>
-# SPDX-License-Identifier: EUPL-1.2
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Tests for the regression scenarios called out in the PRA handoff:
 #   - VM delete must capture disk_path BEFORE issuing DELETE /vm/{id}

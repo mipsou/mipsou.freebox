@@ -1,7 +1,7 @@
 # Ansible Collection — `mipsou.freebox`
 
 [![CI](https://github.com/mipsou/mipsou.freebox/actions/workflows/ci.yml/badge.svg)](https://github.com/mipsou/mipsou.freebox/actions/workflows/ci.yml)
-[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue.svg)](https://joinup.ec.europa.eu/page/eupl-text-11-12)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 Declarative, idempotent management of a Freebox (Free.fr ISP CPE) via its HTTP
 API. Built for PRA / disaster-recovery workflows and homelab infra-as-code.
@@ -73,4 +73,4 @@ parameter if you need a different version.
 
 ## License
 
-EUPL-1.2. See [`LICENSE`](LICENSE).
+GPL-3.0-or-later. See [`LICENSE`](LICENSE).

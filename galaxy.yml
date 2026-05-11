@@ -10,7 +10,7 @@ description: >-
   DHCP reservations, port forwarding. Built for declarative, idempotent
   workflows (PRA, infra-as-code).
 license:
-  - EUPL-1.2
+  - GPL-3.0-or-later
 tags:
   - freebox
   - network
