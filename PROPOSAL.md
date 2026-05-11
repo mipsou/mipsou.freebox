@@ -54,9 +54,10 @@ release pipeline is automated (tag → GitHub Actions → Galaxy). Open to
 co-maintainers from the community.
 
 **Licensing:** Currently EUPL-1.2 — happy to relicense to **GPL-3.0-or-later**
-at acceptance time to align with `community.*` policy (sole author, no CLA
-collection required; EUPL-1.2 Article 5 explicitly permits the GPL-3.0+
-downstream migration).
+at acceptance time to align with `community.*` policy. As sole copyright
+holder, relicensing is straightforward and no CLA collection is required.
+EUPL-1.2 also lists GPL-3.0-or-later in its compatible-licences appendix, so
+the migration is consistent with downstream / combined-work redistribution.
 
 **Migration plan if accepted:**
 
@@ -71,10 +72,10 @@ downstream migration).
 
 **Compliance with the [Collection Requirements](https://docs.ansible.com/ansible/devel/community/collection_contributors/collection_requirements.html):**
 
-- ✅ Ansible-core support: `>=2.15`
+- ✅ Ansible-core support: `>=2.15.0`
 - ✅ Sanity & unit tests green on stable-2.16, stable-2.17, devel
 - ✅ `changelogs/` follows the antsibull-changelog format
-- ✅ `meta/runtime.yml` declares `requires_ansible: '>=2.15'`
+- ✅ `meta/runtime.yml` declares `requires_ansible: '>=2.15.0'`
 - ✅ All modules have proper `DOCUMENTATION` / `EXAMPLES` / `RETURN` blocks
   inheriting common args from `plugins/doc_fragments/main.py`
 - ✅ No third-party Python dependencies at runtime (stdlib only)
