@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright (c) 2026 Mipsou <chpujol@gmail.com>
-# SPDX-License-Identifier: EUPL-1.2
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 # One-shot, idempotent Freebox OS pairing helper for mipsou.freebox.
 #

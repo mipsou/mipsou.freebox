@@ -1,0 +1,15 @@
+---
+breaking_changes:
+  - >-
+    Relicense from EUPL-1.2 to **GPL-3.0-or-later** (sole-author transition,
+    EUPL-1.2 compatible-licences appendix lists GPL-3.0+). Affects ``LICENSE``,
+    ``galaxy.yml`` ``license:`` field, all SPDX headers in ``plugins/``,
+    ``scripts/`` and ``tests/unit/``, and README badge / License section.
+    Aligns the collection with ``community.*`` policy ahead of the
+    forum.ansible.com inclusion proposal.
+minor_changes:
+  - >-
+    ``tests/sanity/ignore-2.{16,17,18,19,20,21,22}.txt``: drop the
+    ``validate-modules:missing-gplv3-license`` exceptions for ``vm.py``,
+    ``vm_disk.py`` and ``fs_file.py`` — no longer needed now that the
+    collection is GPL-3.0-or-later.

@@ -53,11 +53,10 @@ Freebox API on Galaxy.
 release pipeline is automated (tag → GitHub Actions → Galaxy). Open to
 co-maintainers from the community.
 
-**Licensing:** Currently EUPL-1.2 — happy to relicense to **GPL-3.0-or-later**
-at acceptance time to align with `community.*` policy. As sole copyright
-holder, relicensing is straightforward and no CLA collection is required.
-EUPL-1.2 also lists GPL-3.0-or-later in its compatible-licences appendix, so
-the migration is consistent with downstream / combined-work redistribution.
+**Licensing:** **GPL-3.0-or-later** (relicensed from the initial EUPL-1.2 in a
+single sole-author commit on 2026-05-11 — see `LICENSE` and `changelogs/`).
+EUPL-1.2 explicitly lists GPL-3.0-or-later in its compatible-licences appendix,
+so the transition is licence-clean. Ready for `community.*` policy alignment.
 
 **Migration plan if accepted:**
 
