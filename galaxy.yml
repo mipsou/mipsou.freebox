@@ -29,4 +29,5 @@ build_ignore:
   - tests/output
   - dist
   - HANDOFF.md
+  - PROPOSAL.md
   - '*.tar.gz'
