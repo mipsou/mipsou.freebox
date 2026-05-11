@@ -1,0 +1,78 @@
+---
+# Integration test for mipsou.freebox.vm.
+#
+# Requires a live Freebox Delta/Pop with virtualization enabled, plus a
+# pre-uploaded cloud base image. Skipped by default (target marked
+# ``unsupported``); enable with ``ansible-test integration vm --allow-unsupported``.
+#
+# Required vars:
+#   freebox_url        — e.g. https://mafreebox.freebox.fr
+#   freebox_app_id
+#   freebox_app_token
+#   freebox_test_image — absolute path to a qcow2 cloud image on the NAS
+#   freebox_test_dir   — writable dir on the NAS for the per-VM disk
+
+- name: Sanity-check required vars
+  ansible.builtin.assert:
+    that:
+      - freebox_url is defined
+      - freebox_app_id is defined
+      - freebox_app_token is defined
+      - freebox_test_image is defined
+      - freebox_test_dir is defined
+
+- name: Ensure the test VM is absent (cleanup)
+  mipsou.freebox.vm:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    name: ansible-test-vm
+    state: absent
+    delete_disk: true
+
+- name: Create the test VM
+  mipsou.freebox.vm:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    name: ansible-test-vm
+    state: present
+    vcpus: 1
+    memory: 512
+    disk:
+      source_image: "{{ freebox_test_image }}"
+      name: ansible-test-vm.qcow2
+      dir: "{{ freebox_test_dir }}"
+    started: false
+  register: vm_create
+
+- name: Idempotent re-run
+  mipsou.freebox.vm:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    name: ansible-test-vm
+    state: present
+    vcpus: 1
+    memory: 512
+    disk:
+      source_image: "{{ freebox_test_image }}"
+      name: ansible-test-vm.qcow2
+      dir: "{{ freebox_test_dir }}"
+    started: false
+  register: vm_rerun
+
+- name: Verify create + idempotence
+  ansible.builtin.assert:
+    that:
+      - vm_create.changed
+      - not vm_rerun.changed
+
+- name: Cleanup
+  mipsou.freebox.vm:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    name: ansible-test-vm
+    state: absent
+    delete_disk: true

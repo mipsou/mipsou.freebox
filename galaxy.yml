@@ -1,0 +1,32 @@
+---
+namespace: mipsou
+name: freebox
+version: 0.1.0
+readme: README.md
+authors:
+  - Mipsou <chpujol@gmail.com>
+description: >-
+  Manage a Freebox (Free.fr ISP CPE) via its HTTP API — VMs, NAS filesystem,
+  DHCP reservations, port forwarding. Built for declarative, idempotent
+  workflows (PRA, infra-as-code).
+license:
+  - EUPL-1.2
+tags:
+  - freebox
+  - network
+  - virtualization
+  - selfhosted
+  - homelab
+dependencies: {}
+repository: https://github.com/mipsou/mipsou.freebox
+documentation: https://github.com/mipsou/mipsou.freebox/tree/main/docs
+homepage: https://github.com/mipsou/mipsou.freebox
+issues: https://github.com/mipsou/mipsou.freebox/issues
+build_ignore:
+  - .gitlab-ci.yml
+  - .github
+  - .pytest_cache
+  - tests/output
+  - dist
+  - HANDOFF.md
+  - '*.tar.gz'

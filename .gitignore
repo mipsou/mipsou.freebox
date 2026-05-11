@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.tox/
+.venv/
+venv/
+build/
+dist/
+*.tar.gz
+tests/output/
+.coverage
+.idea/
+.vscode/
+
+# Session-specific bootstrap notes — kept locally for context but not part of
+# the public collection (excluded from `ansible-galaxy collection build` via
+# `build_ignore` in galaxy.yml).
+HANDOFF.md

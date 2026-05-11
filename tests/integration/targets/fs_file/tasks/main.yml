@@ -1,0 +1,66 @@
+---
+# Integration test for mipsou.freebox.fs_file.
+#
+# Requires a live Freebox with a writable NAS partition.
+# Skipped by default (target marked ``unsupported``); enable explicitly with
+# ``ansible-test integration fs_file --allow-unsupported``.
+#
+# Required vars:
+#   freebox_url        — e.g. https://mafreebox.freebox.fr
+#   freebox_app_id
+#   freebox_app_token  — provide via vault or env (FREEBOX_APP_TOKEN)
+#   freebox_test_dir   — writable scratch dir on the NAS, e.g. /Disque 1/ansible-tests
+
+- name: Sanity-check required vars
+  ansible.builtin.assert:
+    that:
+      - freebox_url is defined
+      - freebox_app_id is defined
+      - freebox_app_token is defined
+      - freebox_test_dir is defined
+
+- name: Stage a fixture file via a fresh upload step (caller responsibility)
+  ansible.builtin.debug:
+    msg: "fixture file expected at {{ freebox_test_dir }}/source.txt"
+
+- name: Ensure destination is absent (cleanup)
+  mipsou.freebox.fs_file:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    path: "{{ freebox_test_dir }}/clone.txt"
+    state: absent
+
+- name: Clone source.txt -> clone.txt
+  mipsou.freebox.fs_file:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    path: "{{ freebox_test_dir }}/clone.txt"
+    src: "{{ freebox_test_dir }}/source.txt"
+    state: present
+  register: clone_first
+
+- name: Clone again (idempotent)
+  mipsou.freebox.fs_file:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    path: "{{ freebox_test_dir }}/clone.txt"
+    src: "{{ freebox_test_dir }}/source.txt"
+    state: present
+  register: clone_second
+
+- name: Verify idempotence
+  ansible.builtin.assert:
+    that:
+      - clone_first.changed
+      - not clone_second.changed
+
+- name: Cleanup
+  mipsou.freebox.fs_file:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    path: "{{ freebox_test_dir }}/clone.txt"
+    state: absent

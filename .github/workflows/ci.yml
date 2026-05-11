@@ -1,0 +1,102 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# ansible-test requires the collection to be checked out at
+# ansible_collections/<namespace>/<name>. Every job replicates that layout.
+env:
+  COLLECTION_PATH: ansible_collections/mipsou/freebox
+
+jobs:
+  sanity:
+    name: Sanity (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible:
+          - stable-2.16
+          - stable-2.17
+          - devel
+    steps:
+      - name: Check out collection
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.COLLECTION_PATH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-core (${{ matrix.ansible }})
+        run: pip install --disable-pip-version-check
+          https://github.com/ansible/ansible/archive/${{ matrix.ansible }}.tar.gz
+
+      - name: Run sanity tests
+        working-directory: ${{ env.COLLECTION_PATH }}
+        run: ansible-test sanity --docker default -v --color
+
+  units:
+    name: Units (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible:
+          - stable-2.16
+          - stable-2.17
+          - devel
+    steps:
+      - name: Check out collection
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.COLLECTION_PATH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-core (${{ matrix.ansible }})
+        run: pip install --disable-pip-version-check
+          https://github.com/ansible/ansible/archive/${{ matrix.ansible }}.tar.gz
+
+      - name: Run unit tests
+        working-directory: ${{ env.COLLECTION_PATH }}
+        run: ansible-test units --docker default -v --color
+
+  build:
+    name: Build tarball
+    runs-on: ubuntu-latest
+    needs: [sanity, units]
+    steps:
+      - name: Check out collection
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.COLLECTION_PATH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-core
+        run: pip install --disable-pip-version-check ansible-core
+
+      - name: Build collection
+        working-directory: ${{ env.COLLECTION_PATH }}
+        run: ansible-galaxy collection build --output-path dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mipsou-freebox-collection
+          path: ${{ env.COLLECTION_PATH }}/dist/*.tar.gz
+          if-no-files-found: error

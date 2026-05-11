@@ -1,0 +1,48 @@
+---
+ancestor: null
+releases:
+  0.1.0:
+    release_date: '2026-05-11'
+    changes:
+      release_summary: >-
+        Initial release of ``mipsou.freebox`` — declarative management of a
+        Freebox (Free.fr ISP CPE) through its HTTP API. Replaces ad-hoc bash
+        scripts and manual API calls with idempotent Ansible modules supporting
+        ``check_mode`` and ``diff``. P0 scope: VM lifecycle, VM disk cloning,
+        and NAS filesystem operations. Targets ``/api/v15`` by default;
+        configurable via ``api_base``.
+      minor_changes:
+        - >-
+          Ship a run-once pairing helper at ``scripts/pair.py`` (stdlib only).
+          Persists the obtained ``app_token`` to the Windows Credential Manager
+          (``advapi32`` ``CRED_TYPE_GENERIC``, target
+          ``community-freebox-ansible``) or to
+          ``$XDG_CONFIG_HOME/community-freebox/app_token`` (mode 0600) on
+          POSIX, so the physical button press only happens on first invocation.
+        - >-
+          ``scripts/pair.py`` gains an Ansible Vault output mode
+          (``--vault-file`` + ``--vault-password-file`` + ``--vault-var-name``).
+          The vault file is the canonical, idempotent source: re-running the
+          helper is a no-op when the variable is already present; ``--force``
+          rotates it without disturbing neighboring entries; ``--delete``
+          surgically removes the variable block. Token can also be sourced via
+          ``--from-stdin`` to migrate an existing pairing (wincred / file
+          store) into the vault without re-pressing the box button.
+    modules:
+      - name: vm
+        description: >-
+          Manage Freebox VM lifecycle (create, start, stop, delete, recreate)
+          with cloud-init support. Drift on vcpus/memory/cloudinit is reported
+          via ``module.warn`` and reconciled only with ``force_recreate=true``.
+        namespace: ''
+      - name: vm_disk
+        description: >-
+          Clone a Freebox NAS source image into a per-VM disk (qcow2/raw) via
+          the asynchronous ``/vm/disk/copy`` task. Polls completion and cleans
+          up the finished task slot.
+        namespace: ''
+      - name: fs_file
+        description: >-
+          Manage files on the Freebox NAS — copy, move, rename, delete. Handles
+          the base64 path encoding and asynchronous ``/fs/tasks`` polling.
+        namespace: ''
