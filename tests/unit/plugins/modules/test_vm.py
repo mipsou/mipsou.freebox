@@ -11,7 +11,7 @@
 #     the source basename produced by fs/cp).
 #   - state=present + existing VM + no force_recreate must not POST /vm/.
 
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 __metaclass__ = type
 
