@@ -1,0 +1,19 @@
+---
+minor_changes:
+  - >-
+    Add new module ``dhcp_config`` — read-modify-write the singleton Freebox
+    DHCP server configuration. Only parameters explicitly set on the task are
+    sent to the API (true partial PUT). ``gateway`` and ``netmask`` are
+    read-only on the Freebox and cannot be set. Returns ``config`` (full state
+    after) and ``diff`` (mapping of changed keys to before/after values).
+    Validates I(ip_range_start) and I(ip_range_end) against
+    ``validate_dhcp_ip`` (RFC1918 + not ``.0/.1/.254/.255``).
+  - >-
+    Add new module ``connection_config`` — manage WAN connection settings
+    (I(ping), I(remote_access), I(remote_access_port), I(wol_port),
+    I(adblock)). Same partial-PUT pattern as ``dhcp_config``. Validates ports
+    are in 1..65535. ``remote_access_ip`` and ``is_secure_pass`` are read-only.
+  - >-
+    Both modules delegate to ``FreeboxClient.diff_and_put`` (introduced in
+    the previous changelog entry), which keeps the GET/PUT/diff plumbing in
+    one tested place.
