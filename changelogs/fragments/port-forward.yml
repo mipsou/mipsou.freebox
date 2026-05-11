@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add new module ``port_forward`` — declarative management of Freebox NAT
+    (port-forwarding) rules. Idempotency uses the composite tuple
+    ``(ip_proto, wan_port_start, wan_port_end, src_ip)`` since the Freebox
+    assigns the rule ``id`` server-side. The Freebox API supports partial PUT
+    on ``/fw/redir/{id}``, so updates send only the changed keys (unlike
+    ``dhcp_static_lease`` which requires DELETE+POST). Validates ports
+    (1..65535), I(lan_ip) (RFC1918), and I(wan_port_end) >= I(wan_port_start).
