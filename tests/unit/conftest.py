@@ -15,7 +15,11 @@ import importlib
 import os
 import sys
 import types
-from urllib.parse import quote as _stdlib_quote
+
+try:
+    from urllib.parse import quote as _stdlib_quote  # Python 3
+except ImportError:  # pragma: no cover — py2 fallback for ansible-test legacy.ini runs
+    from urllib import quote as _stdlib_quote
 
 
 COLLECTION_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
