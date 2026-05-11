@@ -141,7 +141,7 @@ def validate_rfc1918(ip):
     )
     if not in_private:
         raise ValueError("%s is not in RFC1918 private space" % ip)
-    return "%d.%d.%d.%d" % octets
+    return ".".join(str(o) for o in octets)
 
 
 def validate_dhcp_ip(ip):
