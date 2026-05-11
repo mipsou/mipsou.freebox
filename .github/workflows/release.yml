@@ -1,0 +1,87 @@
+---
+# Release workflow — builds the collection tarball and publishes it to Ansible
+# Galaxy when a `vX.Y.Z` tag is pushed.
+#
+# Pre-requisites (one-time, repo settings):
+#   1. Generate your Galaxy API token at <https://galaxy.ansible.com/ui/token>
+#      (only one active token per account — re-paste the existing one if
+#      already in use elsewhere; do NOT click "Generate" if you want to keep
+#      the same token).
+#   2. Repo → Settings → Secrets and variables → Actions → New repository
+#      secret. Name: GALAXY_API_KEY. Value: the token from step 1.
+#
+# To cut a release:
+#   1. Bump version in galaxy.yml + changelogs/changelog.yaml.
+#   2. git commit -am "Release 0.1.0".
+#   3. git tag v0.1.0 && git push --tags.
+#
+# The workflow attaches the built tarball as a GitHub Release asset too.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'  # pre-releases (v0.1.0-rc1, etc.)
+
+env:
+  COLLECTION_PATH: ansible_collections/mipsou/freebox
+
+jobs:
+  build-and-publish:
+    name: Build and publish to Galaxy
+    runs-on: ubuntu-latest
+    environment: galaxy
+    permissions:
+      contents: write  # for the GitHub Release asset upload
+    steps:
+      - name: Check out collection
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.COLLECTION_PATH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-core
+        run: pip install --disable-pip-version-check ansible-core
+
+      - name: Verify the tag matches galaxy.yml version
+        working-directory: ${{ env.COLLECTION_PATH }}
+        run: |
+          set -e
+          tag_version="${GITHUB_REF_NAME#v}"
+          yaml_version=$(python -c "import yaml,sys; print(yaml.safe_load(open('galaxy.yml'))['version'])")
+          if [ "$tag_version" != "$yaml_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME (version $tag_version) does not match galaxy.yml version $yaml_version."
+            exit 1
+          fi
+          echo "Tag $GITHUB_REF_NAME matches galaxy.yml version $yaml_version."
+
+      - name: Build collection
+        working-directory: ${{ env.COLLECTION_PATH }}
+        run: ansible-galaxy collection build --output-path dist
+
+      - name: Publish to Ansible Galaxy
+        working-directory: ${{ env.COLLECTION_PATH }}
+        env:
+          GALAXY_API_KEY: ${{ secrets.GALAXY_API_KEY }}
+        run: |
+          set -e
+          if [ -z "$GALAXY_API_KEY" ]; then
+            echo "::error::Secret GALAXY_API_KEY is not set on this repository."
+            exit 1
+          fi
+          tarball=$(ls dist/mipsou-freebox-*.tar.gz | head -1)
+          echo "Publishing $tarball …"
+          ansible-galaxy collection publish "$tarball" --api-key "$GALAXY_API_KEY"
+
+      - name: Attach tarball to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.COLLECTION_PATH }}/dist/*.tar.gz
+          fail_on_unmatched_files: true
+          generate_release_notes: true
