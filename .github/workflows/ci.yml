@@ -20,10 +20,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ansible:
-          - stable-2.16
-          - stable-2.17
-          - devel
+        include:
+          - ansible: stable-2.16
+            python: '3.11'
+          - ansible: stable-2.17
+            python: '3.11'
+          - ansible: devel
+            python: '3.12'
     steps:
       - name: Check out collection
         uses: actions/checkout@v4
@@ -33,7 +36,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python }}
 
       - name: Install ansible-core (${{ matrix.ansible }})
         run: pip install --disable-pip-version-check
@@ -49,10 +52,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ansible:
-          - stable-2.16
-          - stable-2.17
-          - devel
+        include:
+          - ansible: stable-2.16
+            python: '3.11'
+          - ansible: stable-2.17
+            python: '3.11'
+          - ansible: devel
+            python: '3.12'
     steps:
       - name: Check out collection
         uses: actions/checkout@v4
@@ -62,7 +68,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python }}
 
       - name: Install ansible-core (${{ matrix.ansible }})
         run: pip install --disable-pip-version-check

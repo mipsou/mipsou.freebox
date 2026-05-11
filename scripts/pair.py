@@ -126,18 +126,18 @@ class WincredStore(CredentialStore):
 
         class CREDENTIAL(ctypes.Structure):
             _fields_ = [
-                ("Flags",              wintypes.DWORD),
-                ("Type",               wintypes.DWORD),
-                ("TargetName",         wintypes.LPWSTR),
-                ("Comment",            wintypes.LPWSTR),
-                ("LastWritten",        wintypes.FILETIME),
+                ("Flags", wintypes.DWORD),
+                ("Type", wintypes.DWORD),
+                ("TargetName", wintypes.LPWSTR),
+                ("Comment", wintypes.LPWSTR),
+                ("LastWritten", wintypes.FILETIME),
                 ("CredentialBlobSize", wintypes.DWORD),
-                ("CredentialBlob",     ctypes.c_void_p),
-                ("Persist",            wintypes.DWORD),
-                ("AttributeCount",     wintypes.DWORD),
-                ("Attributes",         ctypes.c_void_p),
-                ("TargetAlias",        wintypes.LPWSTR),
-                ("UserName",           wintypes.LPWSTR),
+                ("CredentialBlob", ctypes.c_void_p),
+                ("Persist", wintypes.DWORD),
+                ("AttributeCount", wintypes.DWORD),
+                ("Attributes", ctypes.c_void_p),
+                ("TargetAlias", wintypes.LPWSTR),
+                ("UserName", wintypes.LPWSTR),
             ]
 
         self._CREDENTIAL = CREDENTIAL

@@ -13,6 +13,8 @@ DOCUMENTATION = r"""
 module: fs_file
 short_description: Manage files on the Freebox NAS
 version_added: "0.1.0"
+extends_documentation_fragment:
+  - mipsou.freebox.main
 description:
   - Ensure files exist (optionally cloned from a source) or are absent on the
     Freebox NAS (Pop, Delta, Revolution, V7+).

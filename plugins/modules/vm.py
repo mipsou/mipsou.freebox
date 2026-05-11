@@ -13,6 +13,8 @@ DOCUMENTATION = r"""
 module: vm
 short_description: Manage Freebox virtual machines declaratively
 version_added: "0.1.0"
+extends_documentation_fragment:
+  - mipsou.freebox.main
 description:
   - Create, delete, start, stop and recreate VMs on a Freebox server.
   - On C(state=present) for a new VM, clones the I(disk.source_image) into

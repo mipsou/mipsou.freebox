@@ -15,9 +15,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-import pytest
-
-from ansible_collections.mipsou.freebox.plugins.module_utils import freebox_api
 from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
     encode_path,
 )
@@ -141,12 +138,12 @@ def test_cascade_delete_captures_disk_path_before_delete():
     }
     client.responses["/vm/7/stop"] = None
     # First GET on /vm/7 after stop → stopped status; subsequent fs paths exist.
-    client.responses["/vm/7"] = {**vm, "status": "stopped"}
-    client.responses["/vm/7"] = {**vm, "status": "stopped"}
+    client.responses["/vm/7"] = dict(vm, status="stopped")
+    client.responses["/vm/7"] = dict(vm, status="stopped")
     client.fs_existing.add("/Disque 1/VMs/fbx-vm-01.qcow2")
     client.fs_existing.add("/Disque 1/VMs/fbx-vm-01.qcow2.efivars")
     client.responses["/fs/rm/"] = {"id": 42, "state": "running"}
-    client.responses["/vm/7"] = {**vm, "status": "stopped"}  # poll inside _stop_vm
+    client.responses["/vm/7"] = dict(vm, status="stopped")  # poll inside _stop_vm
 
     cleartext = vm_module._cascade_delete(
         client, vm,

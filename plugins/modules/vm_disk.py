@@ -13,6 +13,8 @@ DOCUMENTATION = r"""
 module: vm_disk
 short_description: Manage Freebox VM disk images (clone or blank-create)
 version_added: "0.1.0"
+extends_documentation_fragment:
+  - mipsou.freebox.main
 description:
   - Provide a per-VM disk image on the Freebox NAS, either by cloning a source
     image (typical PRA pattern from a cloud-init base qcow2) or by creating a

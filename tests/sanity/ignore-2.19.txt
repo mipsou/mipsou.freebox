@@ -1,0 +1,6 @@
+plugins/modules/vm.py validate-modules:missing-gplv3-license
+plugins/modules/vm_disk.py validate-modules:missing-gplv3-license
+plugins/modules/fs_file.py validate-modules:missing-gplv3-license
+scripts/pair.py shebang
+scripts/pair.py pep8!skip
+scripts/pair.py pylint!skip
