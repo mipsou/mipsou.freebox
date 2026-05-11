@@ -28,6 +28,12 @@ A shared `module_utils.freebox_api.FreeboxClient` handles the auth dance
 - A Freebox Delta / Pop / Revolution / V7+ with an app token already registered
   (see [`docs/auth.md`](docs/auth.md))
 
+## Install
+
+```bash
+ansible-galaxy collection install mipsou.freebox
+```
+
 ## Quick start
 
 ```yaml

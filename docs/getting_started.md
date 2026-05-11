@@ -22,7 +22,7 @@ Or from a local checkout:
 
 ```bash
 ansible-galaxy collection build
-ansible-galaxy collection install mipsou-freebox-0.1.0.tar.gz --force
+ansible-galaxy collection install mipsou-freebox-*.tar.gz --force
 ```
 
 ## Step 1 — health check
