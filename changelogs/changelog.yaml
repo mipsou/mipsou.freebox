@@ -1,6 +1,33 @@
 ---
 ancestor: null
 releases:
+  0.1.1:
+    release_date: '2026-05-11'
+    changes:
+      release_summary: >-
+        CI / docs polish release. No runtime behavior change. Adds the
+        ``plugins/doc_fragments/main.py`` doc fragment so the common
+        ``url``/``app_id``/``app_token``/``api_base``/``timeout``/
+        ``validate_certs`` arguments are documented once and inherited by
+        every module via ``extends_documentation_fragment``. ``ansible-test
+        sanity`` and ``units`` are now green on stable-2.16, stable-2.17, and
+        devel (unit tests pinned to Python 3.12 to skip py2.7 legacy
+        coverage).
+      minor_changes:
+        - >-
+          Per-module DOCUMENTATION blocks now ``extends_documentation_fragment:
+          [mipsou.freebox.main]``, eliminating ~57 ``validate-modules`` errors
+          about undocumented/typeless common arguments.
+        - >-
+          Bundled ``tests/sanity/ignore-2.{16,17,18,19,20,21,22}.txt`` for
+          legitimate exceptions (collection license is EUPL-1.2 so
+          ``missing-gplv3-license`` is ignored; ``scripts/pair.py`` is a
+          standalone helper, not an Ansible module).
+        - >-
+          GitHub Actions: ``release.yml`` workflow that builds and publishes
+          the collection to Galaxy on every ``vX.Y.Z`` tag (skips publish
+          gracefully when ``GALAXY_API_KEY`` is unset, and attaches the
+          tarball to the GitHub Release).
   0.1.0:
     release_date: '2026-05-11'
     changes:
