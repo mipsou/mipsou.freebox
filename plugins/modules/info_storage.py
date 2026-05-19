@@ -66,25 +66,26 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return the freebox_storage facts dict."""
+    return {
+        "disks": client.get("/storage/disk/") or [],
+        "partitions": client.get("/storage/partition/") or [],
+        "raid": client.get("/storage/raid/") or [],
+    }
+
+
 def main():
     module = AnsibleModule(argument_spec=dict(COMMON_ARGSPEC), supports_check_mode=True)
     client = FreeboxClient(module)
     try:
-        disks = client.get("/storage/disk/") or []
-        partitions = client.get("/storage/partition/") or []
-        raid = client.get("/storage/raid/") or []
+        facts = _collect_facts(client)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 
     module.exit_json(
         changed=False,
-        ansible_facts={
-            "freebox_storage": {
-                "disks": disks,
-                "partitions": partitions,
-                "raid": raid,
-            }
-        },
+        ansible_facts={"freebox_storage": facts},
     )
 
 

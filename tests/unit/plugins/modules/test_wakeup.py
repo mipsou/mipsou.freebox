@@ -16,6 +16,18 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+# ── RecordingClient ───────────────────────────────────────────────────────
+
+
+class RecordingClient(object):
+    def __init__(self):
+        self.calls = []
+
+    def post(self, path, body=None, content_type="application/json"):
+        self.calls.append({"method": "POST", "path": path, "body": body})
+        return None
+
+
 # ── validate_mac ─────────────────────────────────────────────────────────
 
 
@@ -53,51 +65,41 @@ def test_secureon_rejects_invalid():
         validate_secureon_password("notvalid")
 
 
-# ── WoL POST path ─────────────────────────────────────────────────────────
+# ── mod._send_wol ─────────────────────────────────────────────────────────
 
 
-class RecordingClient(object):
-    def __init__(self):
-        self.calls = []
-
-    def post(self, path, body=None, content_type="application/json"):
-        self.calls.append({"method": "POST", "path": path, "body": body})
-        return None
-
-
-def test_wol_post_correct_path():
+def test_send_wol_correct_path():
     client = RecordingClient()
     mac = validate_mac("AA:BB:CC:DD:EE:FF")
-    client.post("/lan/wol/%s/%s/" % ("pub0", mac), body={})
+    mod._send_wol(client, "pub0", mac)
     assert client.calls[0]["path"] == "/lan/wol/pub0/aa:bb:cc:dd:ee:ff/"
 
 
-def test_wol_with_password_sends_body():
+def test_send_wol_with_password_sends_body():
     client = RecordingClient()
     mac = validate_mac("AA:BB:CC:DD:EE:FF")
     password = validate_secureon_password("00:11:22:33:44:55")
-    client.post("/lan/wol/%s/%s/" % ("pub0", mac), body={"password": password})
+    mod._send_wol(client, "pub0", mac, {"password": password})
     assert client.calls[0]["body"] == {"password": "00:11:22:33:44:55"}
 
 
-def test_wol_custom_ifname():
+def test_send_wol_custom_ifname():
     client = RecordingClient()
     mac = validate_mac("aa:bb:cc:dd:ee:ff")
-    client.post("/lan/wol/%s/%s/" % ("eth0", mac), body={})
+    mod._send_wol(client, "eth0", mac)
     assert client.calls[0]["path"] == "/lan/wol/eth0/aa:bb:cc:dd:ee:ff/"
 
 
-def test_check_mode_no_post():
-    """In check_mode, no POST should be issued (simulated here by not calling)."""
-    client = RecordingClient()
-    # check_mode: simply verify no calls were made
-    assert client.calls == []
-
-
-def test_changed_always_true():
-    """Non-idempotent: changed is always true after a send."""
+def test_send_wol_empty_body_when_no_password():
     client = RecordingClient()
     mac = validate_mac("aa:bb:cc:dd:ee:ff")
-    client.post("/lan/wol/pub0/%s/" % mac, body={})
-    # One call was made → action was taken → changed=True
+    mod._send_wol(client, "pub0", mac)
+    assert client.calls[0]["body"] == {}
+
+
+def test_send_wol_issues_exactly_one_post():
+    client = RecordingClient()
+    mac = validate_mac("aa:bb:cc:dd:ee:ff")
+    mod._send_wol(client, "pub0", mac)
     assert len(client.calls) == 1
+    assert client.calls[0]["method"] == "POST"

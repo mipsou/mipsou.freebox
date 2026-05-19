@@ -63,25 +63,26 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return the freebox_shares facts dict."""
+    return {
+        "ftp": client.get("/ftp/config/") or {},
+        "afp": client.get("/afp/config/") or {},
+        "tftp": client.get("/tftp/config/") or {},
+    }
+
+
 def main():
     module = AnsibleModule(argument_spec=dict(COMMON_ARGSPEC), supports_check_mode=True)
     client = FreeboxClient(module)
     try:
-        ftp = client.get("/ftp/config/") or {}
-        afp = client.get("/afp/config/") or {}
-        tftp = client.get("/tftp/config/") or {}
+        facts = _collect_facts(client)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 
     module.exit_json(
         changed=False,
-        ansible_facts={
-            "freebox_shares": {
-                "ftp": ftp,
-                "afp": afp,
-                "tftp": tftp,
-            }
-        },
+        ansible_facts={"freebox_shares": facts},
     )
 
 

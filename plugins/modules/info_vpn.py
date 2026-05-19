@@ -63,25 +63,26 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return the freebox_vpn facts dict."""
+    return {
+        "status": client.get("/vpn/status/") or {},
+        "connections": client.get("/vpn/connection/") or [],
+        "client_configs": client.get("/vpn/client/config/") or [],
+    }
+
+
 def main():
     module = AnsibleModule(argument_spec=dict(COMMON_ARGSPEC), supports_check_mode=True)
     client = FreeboxClient(module)
     try:
-        status = client.get("/vpn/status/") or {}
-        connections = client.get("/vpn/connection/") or []
-        client_configs = client.get("/vpn/client/config/") or []
+        facts = _collect_facts(client)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 
     module.exit_json(
         changed=False,
-        ansible_facts={
-            "freebox_vpn": {
-                "status": status,
-                "connections": connections,
-                "client_configs": client_configs,
-            }
-        },
+        ansible_facts={"freebox_vpn": facts},
     )
 
 

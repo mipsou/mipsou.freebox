@@ -91,6 +91,20 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _pick_hostname(host):
+    """Return the best Ansible hostname for a LAN host dict."""
+    return (
+        (host.get("primary_name") or "").strip()
+        or host.get("id", "")
+        or host.get("mac", "unknown").replace(":", "_")
+    )
+
+
+def _group_name(host_type):
+    """Return the Ansible group name for a given host_type."""
+    return "freebox_%s" % host_type
+
+
 class InventoryModule(BaseInventoryPlugin):
     NAME = "mipsou.freebox.freebox_lan"
 
@@ -130,12 +144,7 @@ class InventoryModule(BaseInventoryPlugin):
             if reachable_only and not host.get("reachable", False):
                 continue
 
-            # Primary name, falling back to MAC with colons replaced.
-            hostname = (
-                (host.get("primary_name") or "").strip()
-                or host.get("id", "")
-                or host.get("mac", "unknown").replace(":", "_")
-            )
+            hostname = _pick_hostname(host)
             if not hostname:
                 continue
 
@@ -155,6 +164,6 @@ class InventoryModule(BaseInventoryPlugin):
             self.inventory.set_variable(hostname, "host_type", host_type)
 
             if group_by_type and host_type:
-                group_name = "freebox_%s" % host_type
-                self.inventory.add_group(group_name)
-                self.inventory.add_host(hostname, group=group_name)
+                grp = _group_name(host_type)
+                self.inventory.add_group(grp)
+                self.inventory.add_host(hostname, group=grp)

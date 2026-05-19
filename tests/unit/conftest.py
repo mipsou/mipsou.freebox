@@ -94,6 +94,58 @@ def _install_ansible_stubs():
     moves.urllib = urllib_pkg
     urllib_pkg.parse = parse_mod
 
+    # ansible.errors
+    errors_mod = types.ModuleType("ansible.errors")
+
+    class _StubAnsibleError(Exception):
+        pass
+
+    errors_mod.AnsibleError = _StubAnsibleError
+    sys.modules["ansible.errors"] = errors_mod
+    ansible.errors = errors_mod
+
+    # ansible.plugins (inventory and lookup base classes)
+    plugins_pkg = types.ModuleType("ansible.plugins")
+    sys.modules["ansible.plugins"] = plugins_pkg
+    ansible.plugins = plugins_pkg
+
+    inv_pkg = types.ModuleType("ansible.plugins.inventory")
+
+    class _StubBaseInventoryPlugin(object):
+        NAME = ""
+
+        def __init__(self):
+            pass
+
+        def verify_file(self, path):
+            return True
+
+        def parse(self, inventory, loader, path, cache=False):
+            pass
+
+        def _read_config_data(self, path):
+            pass
+
+        def get_option(self, key):
+            return None
+
+    inv_pkg.BaseInventoryPlugin = _StubBaseInventoryPlugin
+    sys.modules["ansible.plugins.inventory"] = inv_pkg
+    plugins_pkg.inventory = inv_pkg
+
+    lookup_pkg = types.ModuleType("ansible.plugins.lookup")
+
+    class _StubLookupBase(object):
+        def run(self, terms, variables=None, **kwargs):
+            return []
+
+        def set_options(self, var_options=None, direct=None):
+            pass
+
+    lookup_pkg.LookupBase = _StubLookupBase
+    sys.modules["ansible.plugins.lookup"] = lookup_pkg
+    plugins_pkg.lookup = lookup_pkg
+
 
 def _install_collection_alias():
     """Map ``ansible_collections.mipsou.freebox`` → local ``plugins`` package."""
@@ -126,6 +178,16 @@ def _install_collection_alias():
     mu_pkg.__path__ = [os.path.join(COLLECTION_ROOT, "plugins", "module_utils")]
     sys.modules[qualified + ".plugins.module_utils"] = mu_pkg
     plugins_pkg.module_utils = mu_pkg
+
+    inv_coll_pkg = types.ModuleType(qualified + ".plugins.inventory")
+    inv_coll_pkg.__path__ = [os.path.join(COLLECTION_ROOT, "plugins", "inventory")]
+    sys.modules[qualified + ".plugins.inventory"] = inv_coll_pkg
+    plugins_pkg.inventory = inv_coll_pkg
+
+    lookup_coll_pkg = types.ModuleType(qualified + ".plugins.lookup")
+    lookup_coll_pkg.__path__ = [os.path.join(COLLECTION_ROOT, "plugins", "lookup")]
+    sys.modules[qualified + ".plugins.lookup"] = lookup_coll_pkg
+    plugins_pkg.lookup = lookup_coll_pkg
 
 
 _install_ansible_stubs()

@@ -7,16 +7,19 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import pytest
+
 from ansible_collections.mipsou.freebox.plugins.modules import firewall as mod
+from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import validate_rfc1918
 
 
-# ── Recording client ─────────────────────────────────────────────────────
+# ── RecordingClient ───────────────────────────────────────────────────────
 
 
 class RecordingClient(object):
     def __init__(self, dmz=None, incoming=None):
         self._dmz = dmz or {"enabled": False, "ip": "192.168.1.50"}
-        self._incoming = incoming or []
+        self._incoming = list(incoming or [])
         self.calls = []
 
     def get(self, path, query=None):
@@ -30,7 +33,7 @@ class RecordingClient(object):
     def put(self, path, body=None):
         self.calls.append({"method": "PUT", "path": path, "body": body})
         if path == "/fw/dmz/":
-            self._dmz.update(body)
+            self._dmz.update(body or {})
             return dict(self._dmz)
         raise AssertionError("unexpected PUT %s" % path)
 
@@ -48,41 +51,24 @@ class RecordingClient(object):
         return True, before, after_actual
 
 
-class StubModule(object):
-    def __init__(self, params, check_mode=False):
-        self.params = params
-        self.check_mode = check_mode
-        self._results = []
-        self._failures = []
-
-    def exit_json(self, **kw):
-        self._results.append(kw)
-
-    def fail_json(self, **kw):
-        self._failures.append(kw)
-
-
-# ── validate_rfc1918 used in firewall ────────────────────────────────────
+# ── validate_rfc1918 ───────────────────────────────────────────────────────
 
 
 def test_validate_rfc1918_accepts_192_168():
-    from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import validate_rfc1918
     assert validate_rfc1918("192.168.1.50") == "192.168.1.50"
 
 
 def test_validate_rfc1918_rejects_public():
-    import pytest
-    from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import validate_rfc1918
     with pytest.raises(ValueError):
         validate_rfc1918("8.8.8.8")
 
 
-# ── DMZ diff_and_put ─────────────────────────────────────────────────────
+# ── mod._update_dmz ───────────────────────────────────────────────────────
 
 
-def test_enable_dmz_issues_put():
+def test_update_dmz_enable_issues_put():
     client = RecordingClient(dmz={"enabled": False, "ip": "192.168.1.50"})
-    changed, before, after = client.diff_and_put("/fw/dmz/", {"enabled": True})
+    changed, before, after = mod._update_dmz(client, {"enabled": True})
     assert changed is True
     assert after["enabled"] is True
     puts = [c for c in client.calls if c["method"] == "PUT"]
@@ -90,49 +76,64 @@ def test_enable_dmz_issues_put():
     assert puts[0]["body"] == {"enabled": True}
 
 
-def test_noop_when_dmz_already_enabled():
+def test_update_dmz_noop_when_already_enabled():
     client = RecordingClient(dmz={"enabled": True, "ip": "192.168.1.50"})
-    changed, before, after = client.diff_and_put("/fw/dmz/", {"enabled": True})
+    changed, before, after = mod._update_dmz(client, {"enabled": True})
     assert changed is False
     assert not any(c["method"] == "PUT" for c in client.calls)
 
 
-def test_check_mode_no_put():
+def test_update_dmz_check_mode_no_put():
     client = RecordingClient(dmz={"enabled": False, "ip": "192.168.1.50"})
-    changed, before, after = client.diff_and_put("/fw/dmz/", {"enabled": True}, check_mode=True)
+    changed, before, after = mod._update_dmz(client, {"enabled": True}, check_mode=True)
     assert changed is True
     assert after["enabled"] is True
     assert not any(c["method"] == "PUT" for c in client.calls)
 
 
-def test_ip_change_issues_put():
+def test_update_dmz_ip_change_issues_put():
     client = RecordingClient(dmz={"enabled": True, "ip": "192.168.1.1"})
-    changed, before, after = client.diff_and_put("/fw/dmz/", {"ip": "192.168.1.100"})
+    changed, before, after = mod._update_dmz(client, {"ip": "192.168.1.100"})
     assert changed is True
     assert after["ip"] == "192.168.1.100"
 
 
-# ── Gather facts ─────────────────────────────────────────────────────────
+def test_update_dmz_no_desired_does_get_only():
+    client = RecordingClient(dmz={"enabled": True, "ip": "192.168.1.50"})
+    changed, before, after = mod._update_dmz(client, {})
+    assert changed is False
+    assert after == {"enabled": True, "ip": "192.168.1.50"}
+    assert all(c["method"] == "GET" for c in client.calls)
 
 
-def test_gather_incoming_rules():
+def test_update_dmz_empty_desired_returns_current():
+    client = RecordingClient(dmz={"enabled": False, "ip": "192.168.1.2"})
+    changed, _before, after = mod._update_dmz(client, {})
+    assert changed is False
+    assert after["ip"] == "192.168.1.2"
+
+
+# ── mod._collect_incoming ─────────────────────────────────────────────────
+
+
+def test_collect_incoming_returns_rules():
     rules = [{"id": 1, "enabled": True, "comment": "ssh"}]
     client = RecordingClient(incoming=rules)
-    incoming = client.get("/fw/incoming/")
-    assert incoming == rules
+    result = mod._collect_incoming(client)
+    assert result == rules
+    gets = [c for c in client.calls if c["path"] == "/fw/incoming/"]
+    assert len(gets) == 1
 
 
-def test_gather_facts_empty_list():
+def test_collect_incoming_empty():
     client = RecordingClient(incoming=[])
-    incoming = client.get("/fw/incoming/")
-    assert incoming == []
+    result = mod._collect_incoming(client)
+    assert result == []
 
 
-# ── No-desired noop reads DMZ ─────────────────────────────────────────────
-
-
-def test_no_desired_does_get_only():
-    client = RecordingClient(dmz={"enabled": True, "ip": "192.168.1.50"})
-    dmz = client.get("/fw/dmz/")
-    assert dmz == {"enabled": True, "ip": "192.168.1.50"}
-    assert all(c["method"] == "GET" for c in client.calls)
+def test_collect_incoming_multiple_rules():
+    rules = [{"id": 1}, {"id": 2}, {"id": 3}]
+    client = RecordingClient(incoming=rules)
+    result = mod._collect_incoming(client)
+    assert len(result) == 3
+    assert result[1]["id"] == 2

@@ -53,15 +53,20 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return the DynDNS entries list."""
+    return client.get("/dyndns/") or []
+
+
 def main():
     module = AnsibleModule(argument_spec=dict(COMMON_ARGSPEC), supports_check_mode=True)
     client = FreeboxClient(module)
     try:
-        dyndns = client.get("/dyndns/") or []
+        facts = _collect_facts(client)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 
-    module.exit_json(changed=False, ansible_facts={"freebox_dyndns": dyndns})
+    module.exit_json(changed=False, ansible_facts={"freebox_dyndns": facts})
 
 
 if __name__ == "__main__":

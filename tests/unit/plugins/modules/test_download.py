@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import pytest
+
 from ansible_collections.mipsou.freebox.plugins.modules import download as mod
 
 
@@ -39,7 +41,7 @@ class RecordingClient(object):
         self.calls.append({"method": "PUT", "path": path, "body": body})
         for task in self._tasks:
             if path == "/downloads/%d" % task["id"]:
-                task.update(body)
+                task.update(body or {})
                 return dict(task)
         raise AssertionError("no task for %s" % path)
 
@@ -52,74 +54,86 @@ class RecordingClient(object):
         raise AssertionError("no task for %s" % path)
 
 
-# ── facts state ──────────────────────────────────────────────────────────
+# ── mod._collect_tasks ────────────────────────────────────────────────────
 
 
-def test_facts_returns_all_tasks():
+def test_collect_tasks_returns_all():
     tasks = [{"id": 1, "status": "downloading"}, {"id": 2, "status": "stopped"}]
     client = RecordingClient(tasks=tasks)
-    result = client.get("/downloads/")
+    result = mod._collect_tasks(client)
     assert result == tasks
+    assert len([c for c in client.calls if c["path"] == "/downloads/"]) == 1
 
 
-def test_facts_empty():
+def test_collect_tasks_empty():
     client = RecordingClient(tasks=[])
-    result = client.get("/downloads/")
+    result = mod._collect_tasks(client)
     assert result == []
 
 
-# ── present: add ─────────────────────────────────────────────────────────
+def test_collect_tasks_does_get():
+    client = RecordingClient(tasks=[{"id": 5}])
+    mod._collect_tasks(client)
+    gets = [c for c in client.calls if c["method"] == "GET"]
+    assert len(gets) == 1
 
 
-def test_add_download_posts():
+# ── mod._add_task ─────────────────────────────────────────────────────────
+
+
+def test_add_task_posts_download_url():
     client = RecordingClient()
-    task = client.post("/downloads/", body={"download_url": "https://example.com/x.iso"})
-    assert task["download_url"] == "https://example.com/x.iso"
+    task = mod._add_task(client, "https://example.com/file.iso")
+    assert task["download_url"] == "https://example.com/file.iso"
     assert task["id"] == 100
     posts = [c for c in client.calls if c["method"] == "POST"]
     assert len(posts) == 1
+    assert posts[0]["body"] == {"download_url": "https://example.com/file.iso"}
 
 
-# ── absent: delete ────────────────────────────────────────────────────────
+def test_add_task_returns_task_dict():
+    client = RecordingClient()
+    task = mod._add_task(client, "https://example.com/a.torrent")
+    assert "id" in task
 
 
-def test_delete_removes_task():
+# ── mod._delete_task ──────────────────────────────────────────────────────
+
+
+def test_delete_task_removes_it():
     client = RecordingClient(tasks=[{"id": 42, "status": "stopped"}])
-    client.delete("/downloads/42")
+    mod._delete_task(client, 42)
     assert client._tasks == []
     deletes = [c for c in client.calls if c["method"] == "DELETE"]
     assert len(deletes) == 1
     assert deletes[0]["path"] == "/downloads/42"
 
 
-# ── stopped / downloading: status change ─────────────────────────────────
-
-
-def test_pause_task_updates_status():
+def test_delete_task_uses_numeric_id():
     client = RecordingClient(tasks=[{"id": 7, "status": "downloading"}])
-    updated = client.put("/downloads/7", body={"status": "stopped"})
+    mod._delete_task(client, 7)
+    assert client._tasks == []
+
+
+# ── mod._set_task_status ──────────────────────────────────────────────────
+
+
+def test_set_task_status_stopped():
+    client = RecordingClient(tasks=[{"id": 7, "status": "downloading"}])
+    updated = mod._set_task_status(client, 7, "stopped")
     assert updated["status"] == "stopped"
     puts = [c for c in client.calls if c["method"] == "PUT"]
     assert puts[0]["body"] == {"status": "stopped"}
 
 
-def test_resume_task_updates_status():
+def test_set_task_status_downloading():
     client = RecordingClient(tasks=[{"id": 7, "status": "stopped"}])
-    updated = client.put("/downloads/7", body={"status": "downloading"})
+    updated = mod._set_task_status(client, 7, "downloading")
     assert updated["status"] == "downloading"
 
 
-# ── check_mode ────────────────────────────────────────────────────────────
-
-
-def test_check_mode_add_no_post():
-    client = RecordingClient()
-    # Simulate check mode: no POST called.
-    assert not any(c["method"] == "POST" for c in client.calls)
-
-
-def test_check_mode_delete_no_delete():
-    client = RecordingClient(tasks=[{"id": 1, "status": "downloading"}])
-    # Simulate check mode: no DELETE called.
-    assert not any(c["method"] == "DELETE" for c in client.calls)
-    assert len(client._tasks) == 1
+def test_set_task_status_path_format():
+    client = RecordingClient(tasks=[{"id": 99, "status": "stopped"}])
+    mod._set_task_status(client, 99, "downloading")
+    puts = [c for c in client.calls if c["method"] == "PUT"]
+    assert puts[0]["path"] == "/downloads/99"

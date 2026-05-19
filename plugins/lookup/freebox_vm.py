@@ -128,6 +128,14 @@ def _normalise_vm(vm):
     return result
 
 
+def _filter_by_names(vms, terms):
+    """Return vms matching any of the names in terms (or all if terms is empty)."""
+    if not terms:
+        return vms
+    names = set(terms)
+    return [vm for vm in vms if vm.get("name") in names]
+
+
 class LookupModule(LookupBase):
 
     def run(self, terms, variables=None, **kwargs):
@@ -158,8 +166,6 @@ class LookupModule(LookupBase):
 
         normalised = [_normalise_vm(vm) for vm in vms]
 
-        if terms:
-            names = set(terms)
-            normalised = [vm for vm in normalised if vm.get("name") in names]
+        normalised = _filter_by_names(normalised, terms)
 
         return normalised

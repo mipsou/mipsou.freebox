@@ -57,25 +57,30 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return the freebox_switch facts dict with per-port stats embedded."""
+    ports = client.get("/switch/port/") or []
+    for port in ports:
+        port_id = port.get("id")
+        if port_id is not None:
+            try:
+                port["stats"] = client.get("/switch/port/%s/stats" % port_id) or {}
+            except FreeboxError:
+                port["stats"] = {}
+    return {"ports": ports}
+
+
 def main():
     module = AnsibleModule(argument_spec=dict(COMMON_ARGSPEC), supports_check_mode=True)
     client = FreeboxClient(module)
     try:
-        ports = client.get("/switch/port/") or []
-        # Enrich each port with its stats.
-        for port in ports:
-            port_id = port.get("id")
-            if port_id is not None:
-                try:
-                    port["stats"] = client.get("/switch/port/%s/stats" % port_id) or {}
-                except FreeboxError:
-                    port["stats"] = {}
+        facts = _collect_facts(client)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 
     module.exit_json(
         changed=False,
-        ansible_facts={"freebox_switch": {"ports": ports}},
+        ansible_facts={"freebox_switch": facts},
     )
 
 

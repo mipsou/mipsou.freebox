@@ -53,15 +53,20 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return the call log list."""
+    return client.get("/call/log/") or []
+
+
 def main():
     module = AnsibleModule(argument_spec=dict(COMMON_ARGSPEC), supports_check_mode=True)
     client = FreeboxClient(module)
     try:
-        calls = client.get("/call/log/") or []
+        facts = _collect_facts(client)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 
-    module.exit_json(changed=False, ansible_facts={"freebox_calls": calls})
+    module.exit_json(changed=False, ansible_facts={"freebox_calls": facts})
 
 
 if __name__ == "__main__":

@@ -8,37 +8,18 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 """
-Unit tests for the freebox_vm lookup plugin logic.
+Unit tests for the freebox_vm lookup plugin.
 
-LookupModule.run() requires a full Ansible environment. These tests cover
-the _normalise_vm() helper and name-filtering logic by reimplementing the
-pure functions inline (matching the plugin implementation exactly).
+Tests call the module-level helpers _normalise_vm and _filter_by_names
+directly, without requiring a live Ansible environment.
 """
 
 import base64
 
-from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
-    decode_path,
-    FreeboxError,
+from ansible_collections.mipsou.freebox.plugins.lookup.freebox_vm import (
+    _normalise_vm,
+    _filter_by_names,
 )
-
-
-# ── Inline _normalise_vm (mirrors plugins/lookup/freebox_vm.py) ───────────
-
-_VM_FIELDS = ("id", "name", "status", "mac", "memory", "vcpus")
-
-
-def _normalise_vm(vm):
-    result = {f: vm.get(f) for f in _VM_FIELDS}
-    raw_disk = vm.get("disk_path", "")
-    if raw_disk:
-        try:
-            result["disk_path"] = decode_path(raw_disk)
-        except FreeboxError:
-            result["disk_path"] = raw_disk
-    else:
-        result["disk_path"] = ""
-    return result
 
 
 def _encode(path):
@@ -51,12 +32,8 @@ def _encode(path):
 def test_normalise_vm_decodes_disk_path():
     encoded = _encode("/Disque dur/VMs/fbx-vm-01.qcow2")
     vm = {
-        "id": 1,
-        "name": "fbx-vm-01",
-        "status": "running",
-        "mac": "aa:bb:cc:dd:ee:ff",
-        "memory": 512,
-        "vcpus": 1,
+        "id": 1, "name": "fbx-vm-01", "status": "running",
+        "mac": "aa:bb:cc:dd:ee:ff", "memory": 512, "vcpus": 1,
         "disk_path": encoded,
     }
     result = _normalise_vm(vm)
@@ -65,12 +42,8 @@ def test_normalise_vm_decodes_disk_path():
 
 def test_normalise_vm_preserves_scalar_fields():
     vm = {
-        "id": 42,
-        "name": "my-vm",
-        "status": "stopped",
-        "mac": "11:22:33:44:55:66",
-        "memory": 1024,
-        "vcpus": 2,
+        "id": 42, "name": "my-vm", "status": "stopped",
+        "mac": "11:22:33:44:55:66", "memory": 1024, "vcpus": 2,
         "disk_path": "",
     }
     result = _normalise_vm(vm)
@@ -95,34 +68,25 @@ def test_normalise_vm_missing_disk_path():
 
 
 def test_normalise_vm_invalid_base64_kept_raw():
-    # Non-base64 disk_path is returned as-is.
     vm = {
-        "id": 1,
-        "name": "x",
-        "status": "running",
-        "mac": "",
-        "memory": 256,
-        "vcpus": 1,
-        "disk_path": "!!!not_base64!!!",
+        "id": 1, "name": "x", "status": "running", "mac": "",
+        "memory": 256, "vcpus": 1, "disk_path": "!!!not_base64!!!",
     }
     result = _normalise_vm(vm)
     assert result["disk_path"] == "!!!not_base64!!!"
 
 
-def test_normalise_vm_status_running():
-    vm = {"id": 3, "name": "z", "status": "running", "mac": "", "memory": 512, "vcpus": 2, "disk_path": ""}
+def test_normalise_vm_strips_extra_fields():
+    vm = {
+        "id": 1, "name": "x", "status": "stopped", "mac": "",
+        "memory": 256, "vcpus": 1, "disk_path": "",
+        "extra_field": "should_not_appear",
+    }
     result = _normalise_vm(vm)
-    assert result["status"] == "running"
+    assert "extra_field" not in result
 
 
-# ── Name filter logic ─────────────────────────────────────────────────────
-
-
-def _filter_by_names(vms, terms):
-    if not terms:
-        return vms
-    names = set(terms)
-    return [vm for vm in vms if vm.get("name") in names]
+# ── _filter_by_names ──────────────────────────────────────────────────────
 
 
 def test_filter_returns_matching_vm():
@@ -160,29 +124,25 @@ def test_filter_empty_vm_list():
 
 def test_filter_case_sensitive():
     vms = [{"name": "FBX-VM-01"}]
-    result = _filter_by_names(vms, ["fbx-vm-01"])
-    assert result == []
+    assert _filter_by_names(vms, ["fbx-vm-01"]) == []
 
 
-# ── Error handling contract ───────────────────────────────────────────────
+# ── auth guard logic ──────────────────────────────────────────────────────
 
 
 def test_missing_app_id_raises():
     app_id = None
     app_token = "tok"
-    should_raise = not app_id or not app_token
-    assert should_raise is True
+    assert not app_id or not app_token
 
 
 def test_missing_app_token_raises():
     app_id = "ansible"
     app_token = None
-    should_raise = not app_id or not app_token
-    assert should_raise is True
+    assert not app_id or not app_token
 
 
 def test_both_present_no_raise():
     app_id = "ansible"
     app_token = "tok"
-    should_raise = not app_id or not app_token
-    assert should_raise is False
+    assert not (not app_id or not app_token)

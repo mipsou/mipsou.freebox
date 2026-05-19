@@ -10,10 +10,8 @@ __metaclass__ = type
 """
 Unit tests for read-only info_* modules.
 
-All modules follow the same contract:
-  - GET one or more endpoints
-  - Return ansible_facts with the right key
-  - changed=False always
+Each test calls the module's _collect_facts(client) helper directly,
+which is the extracted pure-logic function backed by a RecordingClient.
 """
 
 from ansible_collections.mipsou.freebox.plugins.modules import (
@@ -28,11 +26,11 @@ from ansible_collections.mipsou.freebox.plugins.modules import (
 )
 
 
-# ── Shared stubs ──────────────────────────────────────────────────────────
+# ── Shared RecordingClient ────────────────────────────────────────────────
 
 
-class StubClient(object):
-    """Returns fixed data per path."""
+class RecordingClient(object):
+    """Returns fixed data per path; raises for unexpected paths."""
 
     def __init__(self, data):
         self._data = data
@@ -40,218 +38,190 @@ class StubClient(object):
 
     def get(self, path, query=None):
         self.calls.append(path)
-        return self._data.get(path, [])
+        if path not in self._data:
+            raise AssertionError("unexpected GET %s" % path)
+        return self._data[path]
 
 
-class StubModule(object):
-    def __init__(self):
-        self._results = []
-        self._failures = []
-
-    def exit_json(self, **kw):
-        self._results.append(kw)
-
-    def fail_json(self, **kw):
-        self._failures.append(kw)
+# ── info_storage._collect_facts ───────────────────────────────────────────
 
 
-# ── info_storage ──────────────────────────────────────────────────────────
-
-
-def test_info_storage_returns_facts():
-    client = StubClient({
+def test_info_storage_returns_all_three_keys():
+    client = RecordingClient({
         "/storage/disk/": [{"id": 1, "type": "hdd"}],
         "/storage/partition/": [{"id": "p1"}],
         "/storage/raid/": [],
     })
-    module = StubModule()
-
-    disks = client.get("/storage/disk/")
-    partitions = client.get("/storage/partition/")
-    raid = client.get("/storage/raid/")
-    facts = {"freebox_storage": {"disks": disks, "partitions": partitions, "raid": raid}}
-
-    assert facts["freebox_storage"]["disks"] == [{"id": 1, "type": "hdd"}]
-    assert facts["freebox_storage"]["partitions"] == [{"id": "p1"}]
-    assert facts["freebox_storage"]["raid"] == []
+    facts = info_storage._collect_facts(client)
+    assert facts["disks"] == [{"id": 1, "type": "hdd"}]
+    assert facts["partitions"] == [{"id": "p1"}]
+    assert facts["raid"] == []
 
 
 def test_info_storage_empty():
-    client = StubClient({"/storage/disk/": [], "/storage/partition/": [], "/storage/raid/": []})
-    disks = client.get("/storage/disk/")
-    assert disks == []
-
-
-def test_info_storage_hits_three_endpoints():
-    client = StubClient({
+    client = RecordingClient({
         "/storage/disk/": [],
         "/storage/partition/": [],
         "/storage/raid/": [],
     })
-    client.get("/storage/disk/")
-    client.get("/storage/partition/")
-    client.get("/storage/raid/")
-    assert len(client.calls) == 3
+    facts = info_storage._collect_facts(client)
+    assert facts["disks"] == []
 
 
-# ── info_vpn ─────────────────────────────────────────────────────────────
+def test_info_storage_hits_three_endpoints():
+    client = RecordingClient({
+        "/storage/disk/": [],
+        "/storage/partition/": [],
+        "/storage/raid/": [],
+    })
+    info_storage._collect_facts(client)
+    assert set(client.calls) == {"/storage/disk/", "/storage/partition/", "/storage/raid/"}
 
 
-def test_info_vpn_returns_all_three_keys():
-    client = StubClient({
+# ── info_vpn._collect_facts ───────────────────────────────────────────────
+
+
+def test_info_vpn_returns_three_keys():
+    client = RecordingClient({
         "/vpn/status/": {"enabled": True},
         "/vpn/connection/": [{"id": "c1"}],
         "/vpn/client/config/": [{"id": "cfg1"}],
     })
-    status = client.get("/vpn/status/")
-    connections = client.get("/vpn/connection/")
-    client_configs = client.get("/vpn/client/config/")
-    facts = {"freebox_vpn": {"status": status, "connections": connections, "client_configs": client_configs}}
-
-    assert facts["freebox_vpn"]["status"] == {"enabled": True}
-    assert facts["freebox_vpn"]["connections"] == [{"id": "c1"}]
-    assert facts["freebox_vpn"]["client_configs"] == [{"id": "cfg1"}]
+    facts = info_vpn._collect_facts(client)
+    assert facts["status"] == {"enabled": True}
+    assert facts["connections"] == [{"id": "c1"}]
+    assert facts["client_configs"] == [{"id": "cfg1"}]
 
 
 def test_info_vpn_empty_connections():
-    client = StubClient({
+    client = RecordingClient({
         "/vpn/status/": {},
         "/vpn/connection/": [],
         "/vpn/client/config/": [],
     })
-    connections = client.get("/vpn/connection/")
-    assert connections == []
+    facts = info_vpn._collect_facts(client)
+    assert facts["connections"] == []
 
 
-# ── info_switch ───────────────────────────────────────────────────────────
+def test_info_vpn_hits_three_endpoints():
+    client = RecordingClient({
+        "/vpn/status/": {},
+        "/vpn/connection/": [],
+        "/vpn/client/config/": [],
+    })
+    info_vpn._collect_facts(client)
+    assert set(client.calls) == {"/vpn/status/", "/vpn/connection/", "/vpn/client/config/"}
+
+
+# ── info_switch._collect_facts ────────────────────────────────────────────
 
 
 def test_info_switch_enriches_with_stats():
-    client = StubClient({
+    client = RecordingClient({
         "/switch/port/": [{"id": 1, "link": "up"}],
         "/switch/port/1/stats": {"rx_bytes": 1000},
     })
-    ports = client.get("/switch/port/")
-    for port in ports:
-        port_id = port.get("id")
-        port["stats"] = client.get("/switch/port/%s/stats" % port_id) or {}
-
-    assert ports[0]["stats"] == {"rx_bytes": 1000}
+    facts = info_switch._collect_facts(client)
+    assert facts["ports"][0]["stats"] == {"rx_bytes": 1000}
 
 
 def test_info_switch_no_ports():
-    client = StubClient({"/switch/port/": []})
-    ports = client.get("/switch/port/")
-    assert ports == []
+    client = RecordingClient({"/switch/port/": []})
+    facts = info_switch._collect_facts(client)
+    assert facts["ports"] == []
 
 
 def test_info_switch_multiple_ports():
-    client = StubClient({
+    client = RecordingClient({
         "/switch/port/": [{"id": 1}, {"id": 2}],
         "/switch/port/1/stats": {"rx_bytes": 100},
         "/switch/port/2/stats": {"rx_bytes": 200},
     })
-    ports = client.get("/switch/port/")
-    for port in ports:
-        port["stats"] = client.get("/switch/port/%s/stats" % port["id"]) or {}
-    assert ports[0]["stats"]["rx_bytes"] == 100
-    assert ports[1]["stats"]["rx_bytes"] == 200
+    facts = info_switch._collect_facts(client)
+    assert facts["ports"][0]["stats"]["rx_bytes"] == 100
+    assert facts["ports"][1]["stats"]["rx_bytes"] == 200
 
 
-# ── info_calls ────────────────────────────────────────────────────────────
+# ── info_calls._collect_facts ─────────────────────────────────────────────
 
 
 def test_info_calls_returns_log():
-    client = StubClient({"/call/log/": [{"id": 1, "type": "missed"}]})
-    calls = client.get("/call/log/")
-    assert calls == [{"id": 1, "type": "missed"}]
+    client = RecordingClient({"/call/log/": [{"id": 1, "type": "missed"}]})
+    facts = info_calls._collect_facts(client)
+    assert facts == [{"id": 1, "type": "missed"}]
+    assert "/call/log/" in client.calls
 
 
 def test_info_calls_empty():
-    client = StubClient({"/call/log/": []})
-    assert client.get("/call/log/") == []
+    client = RecordingClient({"/call/log/": []})
+    assert info_calls._collect_facts(client) == []
 
 
-# ── info_contacts ─────────────────────────────────────────────────────────
+# ── info_contacts._collect_facts ──────────────────────────────────────────
 
 
 def test_info_contacts_returns_list():
-    client = StubClient({"/contact/": [{"id": 1, "first_name": "Alice"}]})
-    contacts = client.get("/contact/")
-    assert contacts[0]["first_name"] == "Alice"
+    client = RecordingClient({"/contact/": [{"id": 1, "first_name": "Alice"}]})
+    facts = info_contacts._collect_facts(client)
+    assert facts[0]["first_name"] == "Alice"
+    assert "/contact/" in client.calls
 
 
 def test_info_contacts_empty():
-    client = StubClient({"/contact/": []})
-    assert client.get("/contact/") == []
+    client = RecordingClient({"/contact/": []})
+    assert info_contacts._collect_facts(client) == []
 
 
-# ── info_tv ───────────────────────────────────────────────────────────────
+# ── info_tv._collect_facts ────────────────────────────────────────────────
 
 
 def test_info_tv_returns_records():
-    client = StubClient({"/pvr/record/": [{"id": 1, "name": "News"}]})
-    records = client.get("/pvr/record/")
-    assert records == [{"id": 1, "name": "News"}]
+    client = RecordingClient({"/pvr/record/": [{"id": 1, "name": "News"}]})
+    facts = info_tv._collect_facts(client)
+    assert facts == [{"id": 1, "name": "News"}]
+    assert "/pvr/record/" in client.calls
 
 
 def test_info_tv_empty():
-    client = StubClient({"/pvr/record/": []})
-    assert client.get("/pvr/record/") == []
+    client = RecordingClient({"/pvr/record/": []})
+    assert info_tv._collect_facts(client) == []
 
 
-# ── info_shares ───────────────────────────────────────────────────────────
+# ── info_shares._collect_facts ────────────────────────────────────────────
 
 
-def test_info_shares_returns_all_protocols():
-    client = StubClient({
+def test_info_shares_returns_three_protocols():
+    client = RecordingClient({
         "/ftp/config/": {"enabled": True},
         "/afp/config/": {"enabled": False},
         "/tftp/config/": {"enabled": False},
     })
-    ftp = client.get("/ftp/config/")
-    afp = client.get("/afp/config/")
-    tftp = client.get("/tftp/config/")
-    facts = {"freebox_shares": {"ftp": ftp, "afp": afp, "tftp": tftp}}
-
-    assert facts["freebox_shares"]["ftp"] == {"enabled": True}
-    assert facts["freebox_shares"]["afp"] == {"enabled": False}
+    facts = info_shares._collect_facts(client)
+    assert facts["ftp"] == {"enabled": True}
+    assert facts["afp"] == {"enabled": False}
+    assert facts["tftp"] == {"enabled": False}
 
 
 def test_info_shares_hits_three_endpoints():
-    client = StubClient({
+    client = RecordingClient({
         "/ftp/config/": {},
         "/afp/config/": {},
         "/tftp/config/": {},
     })
-    client.get("/ftp/config/")
-    client.get("/afp/config/")
-    client.get("/tftp/config/")
-    assert len(client.calls) == 3
+    info_shares._collect_facts(client)
+    assert set(client.calls) == {"/ftp/config/", "/afp/config/", "/tftp/config/"}
 
 
-# ── info_dyndns ───────────────────────────────────────────────────────────
+# ── info_dyndns._collect_facts ────────────────────────────────────────────
 
 
 def test_info_dyndns_returns_list():
-    client = StubClient({"/dyndns/": [{"provider": "ovh", "enabled": True}]})
-    dyndns = client.get("/dyndns/")
-    assert dyndns == [{"provider": "ovh", "enabled": True}]
+    client = RecordingClient({"/dyndns/": [{"provider": "ovh", "enabled": True}]})
+    facts = info_dyndns._collect_facts(client)
+    assert facts == [{"provider": "ovh", "enabled": True}]
+    assert "/dyndns/" in client.calls
 
 
 def test_info_dyndns_empty():
-    client = StubClient({"/dyndns/": []})
-    assert client.get("/dyndns/") == []
-
-
-# ── changed=false contract for all modules ────────────────────────────────
-
-
-def test_all_info_modules_report_changed_false():
-    """Simulate the changed=False contract each info module must honour."""
-    # All info modules exit with changed=False — verified by pattern inspection.
-    # This test documents the contract; actual enforcement is in module code.
-    results = []
-    for _ in range(8):  # 8 info modules
-        results.append({"changed": False})
-    assert all(r["changed"] is False for r in results)
+    client = RecordingClient({"/dyndns/": []})
+    assert info_dyndns._collect_facts(client) == []

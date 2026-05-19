@@ -27,7 +27,7 @@ class RecordingClient(object):
     def put(self, path, body=None):
         self.calls.append({"method": "PUT", "path": path, "body": body})
         if path == "/wifi/config/":
-            self._cfg.update(body)
+            self._cfg.update(body or {})
             return dict(self._cfg)
         raise AssertionError("unexpected PUT %s" % path)
 
@@ -45,12 +45,12 @@ class RecordingClient(object):
         return True, before, after_actual
 
 
-# ── tests ─────────────────────────────────────────────────────────────────
+# ── mod._update_config ────────────────────────────────────────────────────
 
 
-def test_disable_wifi_issues_put():
+def test_update_config_disable_wifi():
     client = RecordingClient(cfg={"enabled": True, "mac_filter_state": "disabled"})
-    changed, before, after = client.diff_and_put("/wifi/config/", {"enabled": False})
+    changed, before, after = mod._update_config(client, {"enabled": False})
     assert changed is True
     assert after["enabled"] is False
     puts = [c for c in client.calls if c["method"] == "PUT"]
@@ -58,45 +58,57 @@ def test_disable_wifi_issues_put():
     assert puts[0]["body"] == {"enabled": False}
 
 
-def test_noop_when_already_disabled():
+def test_update_config_noop_when_already_disabled():
     client = RecordingClient(cfg={"enabled": False, "mac_filter_state": "disabled"})
-    changed, before, after = client.diff_and_put("/wifi/config/", {"enabled": False})
+    changed, before, after = mod._update_config(client, {"enabled": False})
     assert changed is False
     assert not any(c["method"] == "PUT" for c in client.calls)
 
 
-def test_mac_filter_state_change():
+def test_update_config_mac_filter_state_change():
     client = RecordingClient(cfg={"enabled": True, "mac_filter_state": "disabled"})
-    changed, before, after = client.diff_and_put(
-        "/wifi/config/", {"mac_filter_state": "whitelist"}
-    )
+    changed, before, after = mod._update_config(client, {"mac_filter_state": "whitelist"})
     assert changed is True
     assert after["mac_filter_state"] == "whitelist"
 
 
-def test_check_mode_no_put():
+def test_update_config_check_mode_no_put():
     client = RecordingClient(cfg={"enabled": True, "mac_filter_state": "disabled"})
-    changed, before, after = client.diff_and_put(
-        "/wifi/config/", {"enabled": False}, check_mode=True
-    )
+    changed, before, after = mod._update_config(client, {"enabled": False}, check_mode=True)
     assert changed is True
     assert after["enabled"] is False
     assert not any(c["method"] == "PUT" for c in client.calls)
 
 
-def test_no_desired_reads_only():
+def test_update_config_empty_desired_get_only():
     client = RecordingClient(cfg={"enabled": True, "mac_filter_state": "disabled"})
-    cfg = client.get("/wifi/config/")
-    assert cfg["enabled"] is True
+    changed, before, after = mod._update_config(client, {})
+    assert changed is False
+    assert after["enabled"] is True
     assert all(c["method"] == "GET" for c in client.calls)
 
 
-def test_multi_key_change():
+def test_update_config_multi_key_change():
     client = RecordingClient(cfg={"enabled": True, "mac_filter_state": "disabled"})
-    changed, before, after = client.diff_and_put(
-        "/wifi/config/",
-        {"enabled": False, "mac_filter_state": "blacklist"},
+    changed, before, after = mod._update_config(
+        client, {"enabled": False, "mac_filter_state": "blacklist"}
     )
     assert changed is True
     assert after["enabled"] is False
     assert after["mac_filter_state"] == "blacklist"
+
+
+# ── mod._compute_diff ─────────────────────────────────────────────────────
+
+
+def test_compute_diff_single_changed_key():
+    before = {"enabled": True, "mac_filter_state": "disabled"}
+    after = {"enabled": False, "mac_filter_state": "disabled"}
+    diff = mod._compute_diff(before, after, ["enabled", "mac_filter_state"])
+    assert diff == {"enabled": (True, False)}
+
+
+def test_compute_diff_empty_when_unchanged():
+    before = {"enabled": True}
+    after = {"enabled": True}
+    assert mod._compute_diff(before, after, ["enabled"]) == {}
