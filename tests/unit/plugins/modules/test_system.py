@@ -71,7 +71,7 @@ def _base_params(**overrides):
 
 def test_gather_facts_returns_freebox_system():
     client = RecordingClient()
-    info = client.get("/system/")
+    info = mod._collect_facts(client)
     assert info["firmware_version"] == "4.10.2"
     assert info["board_name"] == "fbxgw7r"
     gets = [c for c in client.calls if c["method"] == "GET"]
@@ -81,7 +81,7 @@ def test_gather_facts_returns_freebox_system():
 
 def test_gather_facts_no_reboot_is_unchanged():
     client = RecordingClient()
-    info = client.get("/system/")
+    info = mod._collect_facts(client)
     # No reboot → no POST issued.
     posts = [c for c in client.calls if c["method"] == "POST"]
     assert posts == []
@@ -94,7 +94,7 @@ def test_gather_facts_includes_sensors_and_fans():
     data["sensors"] = [{"id": "temp_t1", "name": "Temp 1", "value": 52}]
     data["fans"] = [{"id": "fan0_speed", "name": "Fan 1", "value": 1462}]
     client = RecordingClient(system_data=data)
-    info = client.get("/system/")
+    info = mod._collect_facts(client)
     assert len(info["sensors"]) == 1
     assert info["sensors"][0]["value"] == 52
     assert len(info["fans"]) == 1
@@ -105,7 +105,7 @@ def test_gather_facts_includes_sensors_and_fans():
 
 def test_reboot_posts_system_reboot():
     client = RecordingClient()
-    client.get("/system/")
+    mod._collect_facts(client)
     client.post("/system/reboot/")
     posts = [c for c in client.calls if c["method"] == "POST"]
     assert len(posts) == 1
@@ -114,7 +114,7 @@ def test_reboot_posts_system_reboot():
 
 def test_reboot_check_mode_no_post():
     client = RecordingClient()
-    client.get("/system/")
+    mod._collect_facts(client)
     # In check_mode: POST must NOT be issued.
     posts = [c for c in client.calls if c["method"] == "POST"]
     assert posts == []
@@ -123,7 +123,7 @@ def test_reboot_check_mode_no_post():
 def test_reboot_true_changed_is_true():
     """Reboot=true always yields changed=true regardless of Freebox state."""
     client = RecordingClient()
-    client.get("/system/")
+    mod._collect_facts(client)
     client.post("/system/reboot/")
     posts = [c for c in client.calls if c["method"] == "POST"]
     # Verify the reboot was issued.
@@ -133,7 +133,7 @@ def test_reboot_true_changed_is_true():
 def test_facts_ansible_facts_key_is_freebox_system():
     """The returned fact must be namespaced as freebox_system."""
     client = RecordingClient()
-    info = client.get("/system/")
+    info = mod._collect_facts(client)
     # Simulate what main() does — wrap in ansible_facts.
     ansible_facts = {"freebox_system": info}
     assert "freebox_system" in ansible_facts
@@ -143,6 +143,6 @@ def test_facts_ansible_facts_key_is_freebox_system():
 def test_gather_facts_empty_response_returns_empty_dict():
     """If the API returns None, facts should be an empty dict (not crash)."""
     client = RecordingClient(system_data={})
-    info = client.get("/system/") or {}
+    info = mod._collect_facts(client)
     ansible_facts = {"freebox_system": info}
     assert isinstance(ansible_facts["freebox_system"], dict)

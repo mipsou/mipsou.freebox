@@ -84,6 +84,11 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_facts(client):
+    """Return system facts dict from GET /system/. Returns {} on None."""
+    return client.get("/system/") or {}
+
+
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
@@ -97,7 +102,7 @@ def main():
 
     client = FreeboxClient(module)
     try:
-        info = client.get("/system/") or {}
+        info = _collect_facts(client)
 
         if not module.params["reboot"]:
             module.exit_json(
