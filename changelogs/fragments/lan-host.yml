@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add new module ``lan_host`` — update the display name (``primary_name``)
+    and/or device type (``host_type``) of a Freebox LAN host. The host is
+    looked up by MAC address; the module handles the firmware quirk where
+    ``l2ident`` may be a single object instead of a list (``as_list`` helper).
+    Only changed fields are sent to ``PUT /lan/browser/pub/{id}`` (partial PUT).
+    Does not create or delete hosts — the Freebox manages the device lifecycle
+    automatically.

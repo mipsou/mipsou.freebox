@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add new module ``fs_directory`` — declarative management of directories on
+    the Freebox NAS. ``state: present`` creates the directory via
+    ``POST /fs/mkdir/`` if absent (fails if a file occupies the path).
+    ``state: absent`` removes the directory and all its contents via
+    ``POST /fs/rm/`` (fails if the path is a file — use ``fs_file`` instead).
+    Both operations poll the async task queue. Adds the directory counterpart
+    to fs_file.
