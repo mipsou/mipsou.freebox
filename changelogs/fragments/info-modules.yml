@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add read-only info modules: ``info_storage`` (disks, partitions, RAID),
+    ``info_vpn`` (server status, connections, client configs),
+    ``info_switch`` (ports with inline statistics),
+    ``info_dyndns`` (DynDNS entries), ``info_shares`` (FTP/AFP/TFTP/Samba
+    shares), ``info_tv`` (PVR recordings), ``info_calls`` (call log), and
+    ``info_contacts`` (contact list). All modules return data exclusively in
+    ``ansible_facts`` and always report ``changed=false``.
