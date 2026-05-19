@@ -9,59 +9,97 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 DOCUMENTATION = r"""
+---
 name: freebox_vm
-short_description: Look up Freebox VMs by name
-description:
-  - Queries C(GET /vm/) and returns a list of VM dicts whose C(name) matches
-    the given term. Case-sensitive.
-  - Returns an empty list if no VM matches (does not raise an error).
+short_description: Look up Freebox VM definitions
 version_added: "0.3.0"
 author:
   - Mipsou (@mipsou)
+description:
+  - Returns the list of VMs from C(GET /vm/) on the Freebox API.
+  - When one or more VM names are passed as terms, only matching VMs are
+    returned (exact name match, case-sensitive).
+  - Returns a list of dicts with keys C(id), C(name), C(status),
+    C(disk_path), C(mac), C(memory), C(vcpus).
 options:
   _terms:
-    description: VM name(s) to look up.
-    required: true
+    description:
+      - Optional VM names to filter by. Return all VMs when omitted.
+    type: list
+    elements: str
   url:
-    description: Freebox base URL.
+    description:
+      - Freebox API base URL.
     type: str
     default: http://mafreebox.freebox.fr
   app_id:
-    description: Application identifier.
+    description:
+      - Application identifier registered with the Freebox.
     type: str
     required: true
   app_token:
-    description: Application token.
+    description:
+      - Application token (secret).
     type: str
     required: true
-    no_log: true
+    secret: true
   api_base:
-    description: API path prefix.
+    description:
+      - API path prefix.
     type: str
     default: /api/v15
   validate_certs:
-    description: Whether to validate TLS certificates.
+    description:
+      - Whether to verify TLS certificates.
     type: bool
     default: true
-  timeout:
-    description: HTTP timeout in seconds.
-    type: int
-    default: 30
 """
 
 EXAMPLES = r"""
-- name: Get VM details
+# Return all VMs
+- name: List all Freebox VMs
+  ansible.builtin.debug:
+    msg: "{{ lookup('mipsou.freebox.freebox_vm',
+               url='http://mafreebox.freebox.fr',
+               app_id='ansible',
+               app_token=freebox_app_token) }}"
+
+# Filter by name
+- name: Get info for fbx-vm-01
   ansible.builtin.debug:
     msg: "{{ lookup('mipsou.freebox.freebox_vm', 'fbx-vm-01',
-              url='http://mafreebox.freebox.fr',
-              app_id='ansible',
-              app_token=freebox_app_token) }}"
+               url='http://mafreebox.freebox.fr',
+               app_id='ansible',
+               app_token=freebox_app_token) }}"
 """
 
 RETURN = r"""
 _list:
-  description: List of VM dicts matching the requested name.
+  description: List of VM dicts matching the optional name filter.
   type: list
+  elements: dict
+  contains:
+    id:
+      description: Numeric VM identifier.
+      type: int
+    name:
+      description: VM display name.
+      type: str
+    status:
+      description: Current VM state (e.g. C(running), C(stopped)).
+      type: str
+    disk_path:
+      description: Path to the primary disk image (base64-decoded).
+      type: str
+    mac:
+      description: VM MAC address.
+      type: str
+    memory:
+      description: Allocated RAM in MiB.
+      type: int
+    vcpus:
+      description: Number of virtual CPUs.
+      type: int
 """
 
 from ansible.errors import AnsibleError
@@ -70,23 +108,39 @@ from ansible.plugins.lookup import LookupBase
 from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
     FreeboxClient,
     FreeboxError,
+    decode_path,
 )
+
+_VM_FIELDS = ("id", "name", "status", "mac", "memory", "vcpus")
+
+
+def _normalise_vm(vm):
+    """Return a normalized VM dict with decode_path applied to disk_path."""
+    result = {f: vm.get(f) for f in _VM_FIELDS}
+    raw_disk = vm.get("disk_path", "")
+    if raw_disk:
+        try:
+            result["disk_path"] = decode_path(raw_disk)
+        except FreeboxError:
+            result["disk_path"] = raw_disk
+    else:
+        result["disk_path"] = ""
+    return result
 
 
 class LookupModule(LookupBase):
 
     def run(self, terms, variables=None, **kwargs):
+        self.set_options(var_options=variables, direct=kwargs)
+
         url = kwargs.get("url", "http://mafreebox.freebox.fr")
         app_id = kwargs.get("app_id")
         app_token = kwargs.get("app_token")
         api_base = kwargs.get("api_base", "/api/v15")
         validate_certs = kwargs.get("validate_certs", True)
-        timeout = kwargs.get("timeout", 30)
 
-        if not app_id:
-            raise AnsibleError("freebox_vm lookup requires 'app_id'")
-        if not app_token:
-            raise AnsibleError("freebox_vm lookup requires 'app_token'")
+        if not app_id or not app_token:
+            raise AnsibleError("freebox_vm lookup requires app_id and app_token")
 
         client = FreeboxClient(
             module=None,
@@ -94,17 +148,18 @@ class LookupModule(LookupBase):
             app_id=app_id,
             app_token=app_token,
             api_base=api_base,
-            timeout=timeout,
             validate_certs=validate_certs,
         )
 
         try:
-            all_vms = client.get("/vm/") or []
+            vms = client.get("/vm/") or []
         except FreeboxError as exc:
-            raise AnsibleError("freebox_vm lookup error: %s" % exc)
+            raise AnsibleError("freebox_vm: %s" % exc)
 
-        result = []
-        for term in terms:
-            matched = [vm for vm in all_vms if vm.get("name") == term]
-            result.extend(matched)
-        return result
+        normalised = [_normalise_vm(vm) for vm in vms]
+
+        if terms:
+            names = set(terms)
+            normalised = [vm for vm in normalised if vm.get("name") in names]
+
+        return normalised

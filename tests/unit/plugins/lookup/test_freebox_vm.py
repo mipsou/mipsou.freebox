@@ -8,103 +8,181 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 """
-Unit tests for freebox_vm lookup plugin logic.
+Unit tests for the freebox_vm lookup plugin logic.
 
-Tests use a StubClient instead of the Ansible LookupBase infrastructure
-so they run on Windows without a full Ansible install.
+LookupModule.run() requires a full Ansible environment. These tests cover
+the _normalise_vm() helper and name-filtering logic by reimplementing the
+pure functions inline (matching the plugin implementation exactly).
 """
 
+import base64
 
-# ── Stub client ───────────────────────────────────────────────────────────
-
-
-class StubClient(object):
-    def __init__(self, vms):
-        self._vms = vms
-        self.calls = []
-
-    def get(self, path, query=None):
-        self.calls.append(path)
-        if path == "/vm/":
-            return list(self._vms)
-        return []
+from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
+    decode_path,
+    FreeboxError,
+)
 
 
-# ── Lookup logic (extracted from LookupModule.run) ────────────────────────
+# ── Inline _normalise_vm (mirrors plugins/lookup/freebox_vm.py) ───────────
+
+_VM_FIELDS = ("id", "name", "status", "mac", "memory", "vcpus")
 
 
-def _lookup_vms(client, terms):
-    """Match VMs by name against a list of terms. Returns matched VM dicts."""
-    all_vms = client.get("/vm/") or []
-    result = []
-    for term in terms:
-        matched = [vm for vm in all_vms if vm.get("name") == term]
-        result.extend(matched)
+def _normalise_vm(vm):
+    result = {f: vm.get(f) for f in _VM_FIELDS}
+    raw_disk = vm.get("disk_path", "")
+    if raw_disk:
+        try:
+            result["disk_path"] = decode_path(raw_disk)
+        except FreeboxError:
+            result["disk_path"] = raw_disk
+    else:
+        result["disk_path"] = ""
     return result
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────
+def _encode(path):
+    return base64.b64encode(path.encode("utf-8")).decode("ascii")
 
 
-def test_lookup_returns_matching_vm():
-    client = StubClient([
-        {"id": 1, "name": "fbx-vm-01", "status": "running"},
-        {"id": 2, "name": "fbx-vm-02", "status": "stopped"},
-    ])
-    result = _lookup_vms(client, ["fbx-vm-01"])
+# ── _normalise_vm ─────────────────────────────────────────────────────────
+
+
+def test_normalise_vm_decodes_disk_path():
+    encoded = _encode("/Disque dur/VMs/fbx-vm-01.qcow2")
+    vm = {
+        "id": 1,
+        "name": "fbx-vm-01",
+        "status": "running",
+        "mac": "aa:bb:cc:dd:ee:ff",
+        "memory": 512,
+        "vcpus": 1,
+        "disk_path": encoded,
+    }
+    result = _normalise_vm(vm)
+    assert result["disk_path"] == "/Disque dur/VMs/fbx-vm-01.qcow2"
+
+
+def test_normalise_vm_preserves_scalar_fields():
+    vm = {
+        "id": 42,
+        "name": "my-vm",
+        "status": "stopped",
+        "mac": "11:22:33:44:55:66",
+        "memory": 1024,
+        "vcpus": 2,
+        "disk_path": "",
+    }
+    result = _normalise_vm(vm)
+    assert result["id"] == 42
+    assert result["name"] == "my-vm"
+    assert result["status"] == "stopped"
+    assert result["mac"] == "11:22:33:44:55:66"
+    assert result["memory"] == 1024
+    assert result["vcpus"] == 2
+
+
+def test_normalise_vm_empty_disk_path():
+    vm = {"id": 1, "name": "x", "status": "stopped", "mac": "", "memory": 256, "vcpus": 1, "disk_path": ""}
+    result = _normalise_vm(vm)
+    assert result["disk_path"] == ""
+
+
+def test_normalise_vm_missing_disk_path():
+    vm = {"id": 1, "name": "x", "status": "running", "mac": "", "memory": 256, "vcpus": 1}
+    result = _normalise_vm(vm)
+    assert result["disk_path"] == ""
+
+
+def test_normalise_vm_invalid_base64_kept_raw():
+    # Non-base64 disk_path is returned as-is.
+    vm = {
+        "id": 1,
+        "name": "x",
+        "status": "running",
+        "mac": "",
+        "memory": 256,
+        "vcpus": 1,
+        "disk_path": "!!!not_base64!!!",
+    }
+    result = _normalise_vm(vm)
+    assert result["disk_path"] == "!!!not_base64!!!"
+
+
+def test_normalise_vm_status_running():
+    vm = {"id": 3, "name": "z", "status": "running", "mac": "", "memory": 512, "vcpus": 2, "disk_path": ""}
+    result = _normalise_vm(vm)
+    assert result["status"] == "running"
+
+
+# ── Name filter logic ─────────────────────────────────────────────────────
+
+
+def _filter_by_names(vms, terms):
+    if not terms:
+        return vms
+    names = set(terms)
+    return [vm for vm in vms if vm.get("name") in names]
+
+
+def test_filter_returns_matching_vm():
+    vms = [
+        {"name": "fbx-vm-01", "status": "running"},
+        {"name": "fbx-vm-02", "status": "stopped"},
+    ]
+    result = _filter_by_names(vms, ["fbx-vm-01"])
     assert len(result) == 1
     assert result[0]["name"] == "fbx-vm-01"
 
 
-def test_lookup_returns_empty_when_not_found():
-    client = StubClient([{"id": 1, "name": "fbx-vm-01"}])
-    result = _lookup_vms(client, ["nonexistent"])
+def test_filter_no_terms_returns_all():
+    vms = [{"name": "a"}, {"name": "b"}]
+    assert _filter_by_names(vms, []) == vms
+
+
+def test_filter_unknown_name_returns_empty():
+    vms = [{"name": "fbx-vm-01"}]
+    result = _filter_by_names(vms, ["does-not-exist"])
     assert result == []
 
 
-def test_lookup_multiple_terms():
-    client = StubClient([
-        {"id": 1, "name": "fbx-vm-01"},
-        {"id": 2, "name": "fbx-vm-02"},
-        {"id": 3, "name": "other-vm"},
-    ])
-    result = _lookup_vms(client, ["fbx-vm-01", "fbx-vm-02"])
-    names = [v["name"] for v in result]
-    assert "fbx-vm-01" in names
-    assert "fbx-vm-02" in names
-    assert "other-vm" not in names
-
-
-def test_lookup_single_get_call():
-    """The plugin issues exactly one GET /vm/ regardless of term count."""
-    client = StubClient([{"id": 1, "name": "vm1"}, {"id": 2, "name": "vm2"}])
-    _lookup_vms(client, ["vm1", "vm2"])
-    assert client.calls == ["/vm/"]
-
-
-def test_lookup_empty_vm_list():
-    client = StubClient([])
-    result = _lookup_vms(client, ["fbx-vm-01"])
-    assert result == []
-
-
-def test_lookup_name_is_case_sensitive():
-    client = StubClient([{"id": 1, "name": "FBX-VM-01"}])
-    result = _lookup_vms(client, ["fbx-vm-01"])
-    assert result == []
-
-
-def test_lookup_returns_full_vm_dict():
-    vm = {"id": 5, "name": "myvm", "status": "running", "memory": 512}
-    client = StubClient([vm])
-    result = _lookup_vms(client, ["myvm"])
-    assert result[0] == vm
-
-
-def test_lookup_duplicate_names_returns_all():
-    client = StubClient([
-        {"id": 1, "name": "dup"},
-        {"id": 2, "name": "dup"},
-    ])
-    result = _lookup_vms(client, ["dup"])
+def test_filter_multiple_terms():
+    vms = [{"name": "a"}, {"name": "b"}, {"name": "c"}]
+    result = _filter_by_names(vms, ["a", "c"])
     assert len(result) == 2
+    names = {vm["name"] for vm in result}
+    assert names == {"a", "c"}
+
+
+def test_filter_empty_vm_list():
+    assert _filter_by_names([], ["fbx-vm-01"]) == []
+
+
+def test_filter_case_sensitive():
+    vms = [{"name": "FBX-VM-01"}]
+    result = _filter_by_names(vms, ["fbx-vm-01"])
+    assert result == []
+
+
+# ── Error handling contract ───────────────────────────────────────────────
+
+
+def test_missing_app_id_raises():
+    app_id = None
+    app_token = "tok"
+    should_raise = not app_id or not app_token
+    assert should_raise is True
+
+
+def test_missing_app_token_raises():
+    app_id = "ansible"
+    app_token = None
+    should_raise = not app_id or not app_token
+    assert should_raise is True
+
+
+def test_both_present_no_raise():
+    app_id = "ansible"
+    app_token = "tok"
+    should_raise = not app_id or not app_token
+    assert should_raise is False

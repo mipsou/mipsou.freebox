@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - >-
+    Add ``freebox_vm`` lookup plugin — returns the list of Freebox VMs from
+    ``GET /vm/``, optionally filtered by name. Each VM dict includes ``id``,
+    ``name``, ``status``, ``disk_path`` (base64-decoded), ``mac``,
+    ``memory``, and ``vcpus``. Usage:
+    ``lookup('mipsou.freebox.freebox_vm', 'fbx-vm-01', url=..., app_id=...,
+    app_token=...)``.
