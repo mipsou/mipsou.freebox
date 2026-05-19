@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add new module ``route`` — declarative management of Freebox static IPv4
+    and IPv6 routes. Idempotency uses ``(ip, mask, gw)`` for IPv4 and
+    ``(ip, prefix_len, gw)`` for IPv6. The Freebox API exposes no PUT on
+    routes, so updates are implemented as DELETE+POST. Auto-detects address
+    family from the presence of ``:`` in the destination address. Validates
+    IPv4 addresses via ``parse_ipv4()`` and IPv6 via a basic colon-count
+    check consistent with Python 2.7 compatibility constraints.

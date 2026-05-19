@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - >-
+    Add new module ``wifi_ssid`` — idempotent management of Freebox Wi-Fi
+    SSID settings. Keyed on SSID name; an optional ``ap_id`` parameter
+    disambiguates when multiple APs broadcast the same name. Supports
+    ``enabled``, ``hide_ssid``, and ``encryption`` fields via partial PUT
+    on ``/wifi/ap/{ap_id}/ssid/{id}``. Only ``state=present`` is supported
+    (SSID creation is out of scope).

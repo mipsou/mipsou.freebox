@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - >-
+    Add new module ``system`` — gathers Freebox system information
+    (firmware version, uptime, MAC, serial, sensors, fans) as
+    ``ansible_facts.freebox_system`` via ``GET /system/``. When
+    ``reboot=true``, issues ``POST /system/reboot/`` and returns
+    ``changed=true``; in check_mode the POST is skipped but ``changed=true``
+    is still reported. The module is always ``changed=false`` for fact-only
+    runs.
