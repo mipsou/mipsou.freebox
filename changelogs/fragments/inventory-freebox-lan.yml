@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - >-
+    Add ``freebox_lan`` inventory plugin — dynamically builds an Ansible
+    inventory from ``GET /lan/browser/pub/``. Hosts are grouped by
+    ``host_type`` (e.g. ``freebox_workstation``, ``freebox_smartphone``)
+    when ``group_by_type: true`` (default). Host variables include ``mac``,
+    ``ip``, ``reachable``, ``vendor_name``, and ``host_type``. Supports
+    ``reachable_only`` filtering and ``validate_certs``.

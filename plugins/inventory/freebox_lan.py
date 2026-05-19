@@ -9,63 +9,80 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 DOCUMENTATION = r"""
+---
 name: freebox_lan
-short_description: Inventory hosts from the Freebox LAN browser
-description:
-  - Queries C(GET /lan/browser/pub/) to discover hosts on the local network.
-  - Groups hosts by C(host_type) (e.g. C(freebox_workstation), C(freebox_smartphone)).
-  - Sets C(ansible_host) to the first active IPv4 address, along with C(mac),
-    C(host_type), and C(name) host variables.
+short_description: Inventory plugin for Freebox LAN hosts
 version_added: "0.3.0"
 author:
   - Mipsou (@mipsou)
+description:
+  - Generates an Ansible inventory from the Freebox LAN browser
+    (C(GET /lan/browser/pub/)).
+  - Each host in the Freebox ARP/NDP table is added as an Ansible host.
+  - Hosts are grouped automatically by C(host_type) when C(group_by_type)
+    is C(true) (e.g. group C(freebox_workstation), C(freebox_smartphone)).
 options:
   plugin:
-    description: Name of the plugin — must be C(mipsou.freebox.freebox_lan).
+    description:
+      - Must be C(mipsou.freebox.freebox_lan).
     required: true
-    type: str
-    choices: [mipsou.freebox.freebox_lan]
-  freebox_url:
-    description: Base URL of the Freebox API.
+    choices: ["mipsou.freebox.freebox_lan"]
+  url:
+    description:
+      - Base URL of the Freebox OS API (without trailing slash).
     type: str
     default: http://mafreebox.freebox.fr
     env:
       - name: FREEBOX_URL
-  freebox_app_id:
-    description: Application identifier used to authenticate against the Freebox.
+  app_id:
+    description:
+      - Application identifier registered with the Freebox.
     type: str
     required: true
     env:
       - name: FREEBOX_APP_ID
-  freebox_app_token:
-    description: Application token (keep secret).
+  app_token:
+    description:
+      - Application token (secret).
     type: str
     required: true
-    no_log: true
+    secret: true
     env:
       - name: FREEBOX_APP_TOKEN
-  freebox_api_base:
-    description: API path prefix.
+  api_base:
+    description:
+      - API path prefix.
     type: str
     default: /api/v15
-  freebox_validate_certs:
-    description: Whether to validate TLS certificates.
+  validate_certs:
+    description:
+      - Whether to verify TLS certificates.
     type: bool
     default: true
-  freebox_timeout:
-    description: HTTP timeout in seconds.
-    type: int
-    default: 30
+  group_by_type:
+    description:
+      - When C(true), create groups named C(freebox_<host_type>) for each
+        distinct C(host_type) returned by the Freebox.
+    type: bool
+    default: true
+  reachable_only:
+    description:
+      - When C(true), only include hosts currently reachable on the LAN.
+    type: bool
+    default: false
 """
 
 EXAMPLES = r"""
-# freebox_lan.yml — place in an inventory directory
+# freebox_lan.yml — place in your inventory directory
 plugin: mipsou.freebox.freebox_lan
-freebox_url: http://mafreebox.freebox.fr
-freebox_app_id: ansible
-freebox_app_token: "{{ lookup('env', 'FREEBOX_APP_TOKEN') }}"
+url: http://mafreebox.freebox.fr
+app_id: ansible
+app_token: "{{ lookup('env', 'FREEBOX_APP_TOKEN') }}"
+group_by_type: true
+reachable_only: false
 """
 
+from ansible.errors import AnsibleError
 from ansible.plugins.inventory import BaseInventoryPlugin
 
 from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
@@ -82,73 +99,62 @@ class InventoryModule(BaseInventoryPlugin):
             return False
         return path.endswith(("freebox_lan.yml", "freebox_lan.yaml"))
 
-    def parse(self, inventory, loader, path, cache=True):
+    def parse(self, inventory, loader, path, cache=False):
         super(InventoryModule, self).parse(inventory, loader, path, cache)
         self._read_config_data(path)
 
-        url = self.get_option("freebox_url")
-        app_id = self.get_option("freebox_app_id")
-        app_token = self.get_option("freebox_app_token")
-        api_base = self.get_option("freebox_api_base")
-        timeout = self.get_option("freebox_timeout")
-        validate_certs = self.get_option("freebox_validate_certs")
+        url = self.get_option("url")
+        app_id = self.get_option("app_id")
+        app_token = self.get_option("app_token")
+        api_base = self.get_option("api_base")
+        validate_certs = self.get_option("validate_certs")
+        group_by_type = self.get_option("group_by_type")
+        reachable_only = self.get_option("reachable_only")
 
+        # Plugin context uses open_url; pass module=None.
         client = FreeboxClient(
             module=None,
             url=url,
             app_id=app_id,
             app_token=app_token,
             api_base=api_base,
-            timeout=timeout,
             validate_certs=validate_certs,
         )
 
         try:
             hosts = client.get("/lan/browser/pub/") or []
         except FreeboxError as exc:
-            raise Exception("freebox_lan inventory: %s" % exc)
+            raise AnsibleError("freebox_lan: failed to fetch LAN hosts: %s" % exc)
 
         for host in hosts:
-            hostname = host.get("primary_name") or host.get("id") or host.get("mac", "unknown")
-            host_type = host.get("host_type", "unknown")
-            mac = host.get("l2ident", {}).get("id") or host.get("mac", "")
+            if reachable_only and not host.get("reachable", False):
+                continue
 
-            # First active IPv4 address.
-            ansible_host = None
-            for addr in host.get("l3connectivities") or []:
-                if addr.get("af") == "ipv4" and addr.get("reachable"):
-                    ansible_host = addr.get("addr")
-                    break
+            # Primary name, falling back to MAC with colons replaced.
+            hostname = (
+                (host.get("primary_name") or "").strip()
+                or host.get("id", "")
+                or host.get("mac", "unknown").replace(":", "_")
+            )
+            if not hostname:
+                continue
 
-            # Group name: prefix + sanitized host_type.
-            group = "freebox_%s" % host_type.replace("-", "_").replace(" ", "_")
-            self.inventory.add_group(group)
-            self.inventory.add_host(hostname, group=group)
+            self.inventory.add_host(hostname)
 
-            if ansible_host:
-                self.inventory.set_variable(hostname, "ansible_host", ansible_host)
-            self.inventory.set_variable(hostname, "mac", mac)
+            for var in ("mac", "reachable", "vendor_name"):
+                val = host.get(var)
+                if val is not None:
+                    self.inventory.set_variable(hostname, var, val)
+
+            # First L3 address as ansible var.
+            l3 = host.get("l3connectivities") or []
+            if l3:
+                self.inventory.set_variable(hostname, "ip", l3[0].get("addr", ""))
+
+            host_type = host.get("host_type", "")
             self.inventory.set_variable(hostname, "host_type", host_type)
-            self.inventory.set_variable(hostname, "name", hostname)
 
-    def get_option(self, option):
-        return self._options.get(option)
-
-    def _read_config_data(self, path):
-        """Load YAML config and populate self._options."""
-        try:
-            from ansible.parsing.dataloader import DataLoader
-            loader = DataLoader()
-            data = loader.load_from_file(path) or {}
-        except Exception:
-            data = {}
-        defaults = {
-            "freebox_url": "http://mafreebox.freebox.fr",
-            "freebox_app_id": None,
-            "freebox_app_token": None,
-            "freebox_api_base": "/api/v15",
-            "freebox_timeout": 30,
-            "freebox_validate_certs": True,
-        }
-        defaults.update(data)
-        self._options = defaults
+            if group_by_type and host_type:
+                group_name = "freebox_%s" % host_type
+                self.inventory.add_group(group_name)
+                self.inventory.add_host(hostname, group=group_name)

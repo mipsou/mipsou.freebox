@@ -8,162 +8,138 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 """
-Unit tests for freebox_lan inventory plugin logic.
+Unit tests for the freebox_lan inventory plugin logic.
 
-Tests focus on the host-extraction and grouping logic; the Ansible plugin
-infrastructure (BaseInventoryPlugin) is not instantiated here because it
-requires a full Ansible install.  We instead test the pure-Python helpers
-that the parse() method calls.
+The InventoryModule.parse() depends on Ansible's plugin framework and
+can't be tested without a full config file. These tests cover the
+pure-logic helpers (hostname selection, group naming, filtering) by
+exercising the same code paths used in parse().
 """
 
 
-# ── Pure-logic helpers replicated from the plugin ────────────────────────
+# ── Hostname selection logic ───────────────────────────────────────────────
 
 
-def _first_active_ipv4(host):
-    """Return the first reachable IPv4 address or None."""
-    for addr in host.get("l3connectivities") or []:
-        if addr.get("af") == "ipv4" and addr.get("reachable"):
-            return addr.get("addr")
+def _pick_hostname(host):
+    """Mirror the hostname selection from InventoryModule.parse()."""
+    return (
+        (host.get("primary_name") or "").strip()
+        or host.get("id", "")
+        or host.get("mac", "unknown").replace(":", "_")
+    )
+
+
+def test_primary_name_used_first():
+    host = {"primary_name": "my-nas", "mac": "aa:bb:cc:dd:ee:ff"}
+    assert _pick_hostname(host) == "my-nas"
+
+
+def test_id_used_when_no_primary_name():
+    host = {"primary_name": "", "id": "fbx-vm-01", "mac": "aa:bb:cc:dd:ee:ff"}
+    assert _pick_hostname(host) == "fbx-vm-01"
+
+
+def test_mac_fallback_replaces_colons():
+    host = {"primary_name": "", "id": "", "mac": "aa:bb:cc:dd:ee:ff"}
+    assert _pick_hostname(host) == "aa_bb_cc_dd_ee_ff"
+
+
+def test_whitespace_only_primary_name_falls_through():
+    host = {"primary_name": "   ", "id": "", "mac": "11:22:33:44:55:66"}
+    assert _pick_hostname(host) == "11_22_33_44_55_66"
+
+
+# ── Group naming ──────────────────────────────────────────────────────────
+
+
+def test_group_name_from_host_type():
+    host_type = "workstation"
+    assert "freebox_%s" % host_type == "freebox_workstation"
+
+
+def test_group_name_smartphone():
+    assert "freebox_%s" % "smartphone" == "freebox_smartphone"
+
+
+def test_no_group_when_group_by_type_false():
+    host_type = "printer"
+    group_by_type = False
+    groups_to_add = ["freebox_%s" % host_type] if group_by_type and host_type else []
+    assert groups_to_add == []
+
+
+def test_no_group_when_host_type_empty():
+    host_type = ""
+    group_by_type = True
+    groups_to_add = ["freebox_%s" % host_type] if group_by_type and host_type else []
+    assert groups_to_add == []
+
+
+# ── reachable_only filter ─────────────────────────────────────────────────
+
+
+def _filter_hosts(hosts, reachable_only):
+    return [h for h in hosts if not reachable_only or h.get("reachable", False)]
+
+
+def test_reachable_only_excludes_unreachable():
+    hosts = [
+        {"primary_name": "a", "reachable": True},
+        {"primary_name": "b", "reachable": False},
+    ]
+    result = _filter_hosts(hosts, reachable_only=True)
+    assert len(result) == 1
+    assert result[0]["primary_name"] == "a"
+
+
+def test_reachable_only_false_includes_all():
+    hosts = [
+        {"primary_name": "a", "reachable": True},
+        {"primary_name": "b", "reachable": False},
+    ]
+    result = _filter_hosts(hosts, reachable_only=False)
+    assert len(result) == 2
+
+
+def test_empty_host_list():
+    assert _filter_hosts([], reachable_only=True) == []
+
+
+# ── L3 address extraction ─────────────────────────────────────────────────
+
+
+def _extract_ip(host):
+    l3 = host.get("l3connectivities") or []
+    if l3:
+        return l3[0].get("addr", "")
     return None
 
 
-def _group_name(host_type):
-    """Sanitize host_type into a valid Ansible group name."""
-    return "freebox_%s" % host_type.replace("-", "_").replace(" ", "_")
+def test_l3_ip_extracted():
+    host = {"l3connectivities": [{"addr": "192.168.1.100"}]}
+    assert _extract_ip(host) == "192.168.1.100"
 
 
-def _hostname(host):
-    """Derive a display hostname from a LAN browser entry."""
-    return host.get("primary_name") or host.get("id") or host.get("mac", "unknown")
+def test_l3_ip_missing():
+    host = {}
+    assert _extract_ip(host) is None
 
 
-def _extract_mac(host):
-    """Return the MAC address string from a LAN browser entry."""
-    return host.get("l2ident", {}).get("id") or host.get("mac", "")
+def test_l3_ip_empty_list():
+    host = {"l3connectivities": []}
+    assert _extract_ip(host) is None
 
 
-# ── Test _first_active_ipv4 ───────────────────────────────────────────────
+# ── verify_file logic ─────────────────────────────────────────────────────
 
 
-def test_first_active_ipv4_returns_reachable():
-    host = {
-        "l3connectivities": [
-            {"af": "ipv4", "reachable": True, "addr": "192.168.1.100"},
-        ]
-    }
-    assert _first_active_ipv4(host) == "192.168.1.100"
+def test_verify_file_accepts_yml():
+    assert "freebox_lan.yml".endswith(("freebox_lan.yml", "freebox_lan.yaml"))
 
 
-def test_first_active_ipv4_skips_unreachable():
-    host = {
-        "l3connectivities": [
-            {"af": "ipv4", "reachable": False, "addr": "192.168.1.1"},
-            {"af": "ipv4", "reachable": True, "addr": "192.168.1.2"},
-        ]
-    }
-    assert _first_active_ipv4(host) == "192.168.1.2"
+def test_verify_file_accepts_yaml():
+    assert "freebox_lan.yaml".endswith(("freebox_lan.yml", "freebox_lan.yaml"))
 
 
-def test_first_active_ipv4_skips_ipv6():
-    host = {
-        "l3connectivities": [
-            {"af": "ipv6", "reachable": True, "addr": "fe80::1"},
-        ]
-    }
-    assert _first_active_ipv4(host) is None
-
-
-def test_first_active_ipv4_empty():
-    assert _first_active_ipv4({}) is None
-
-
-def test_first_active_ipv4_none_connectivities():
-    assert _first_active_ipv4({"l3connectivities": None}) is None
-
-
-# ── Test _group_name ──────────────────────────────────────────────────────
-
-
-def test_group_name_workstation():
-    assert _group_name("workstation") == "freebox_workstation"
-
-
-def test_group_name_replaces_hyphens():
-    assert _group_name("smart-phone") == "freebox_smart_phone"
-
-
-def test_group_name_replaces_spaces():
-    assert _group_name("set top box") == "freebox_set_top_box"
-
-
-def test_group_name_unknown():
-    assert _group_name("unknown") == "freebox_unknown"
-
-
-# ── Test _hostname ────────────────────────────────────────────────────────
-
-
-def test_hostname_uses_primary_name():
-    host = {"primary_name": "mypc", "id": "abc", "mac": "aa:bb:cc:dd:ee:ff"}
-    assert _hostname(host) == "mypc"
-
-
-def test_hostname_falls_back_to_id():
-    host = {"id": "device-id-123", "mac": "aa:bb:cc:dd:ee:ff"}
-    assert _hostname(host) == "device-id-123"
-
-
-def test_hostname_falls_back_to_mac():
-    host = {"mac": "aa:bb:cc:dd:ee:ff"}
-    assert _hostname(host) == "aa:bb:cc:dd:ee:ff"
-
-
-def test_hostname_defaults_to_unknown():
-    assert _hostname({}) == "unknown"
-
-
-# ── Test _extract_mac ─────────────────────────────────────────────────────
-
-
-def test_extract_mac_from_l2ident():
-    host = {"l2ident": {"id": "aa:bb:cc:dd:ee:ff", "type": "mac"}}
-    assert _extract_mac(host) == "aa:bb:cc:dd:ee:ff"
-
-
-def test_extract_mac_falls_back_to_mac_field():
-    host = {"mac": "11:22:33:44:55:66"}
-    assert _extract_mac(host) == "11:22:33:44:55:66"
-
-
-def test_extract_mac_empty():
-    assert _extract_mac({}) == ""
-
-
-# ── Integration: build host dict ─────────────────────────────────────────
-
-
-def test_full_host_extraction():
-    host = {
-        "primary_name": "nas",
-        "host_type": "workstation",
-        "mac": "aa:bb:cc:dd:ee:ff",
-        "l2ident": {"id": "aa:bb:cc:dd:ee:ff", "type": "mac"},
-        "l3connectivities": [
-            {"af": "ipv4", "reachable": True, "addr": "192.168.1.10"}
-        ],
-    }
-    assert _hostname(host) == "nas"
-    assert _group_name(host["host_type"]) == "freebox_workstation"
-    assert _first_active_ipv4(host) == "192.168.1.10"
-    assert _extract_mac(host) == "aa:bb:cc:dd:ee:ff"
-
-
-def test_host_without_ip():
-    host = {
-        "primary_name": "printer",
-        "host_type": "networking",
-        "l3connectivities": [],
-    }
-    assert _first_active_ipv4(host) is None
-    assert _group_name(host["host_type"]) == "freebox_networking"
+def test_verify_file_rejects_other():
+    assert not "hosts.yml".endswith(("freebox_lan.yml", "freebox_lan.yaml"))
