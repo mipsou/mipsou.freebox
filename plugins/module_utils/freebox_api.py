@@ -15,7 +15,7 @@ import re
 import time
 
 from ansible.module_utils.six.moves.urllib.parse import quote
-from ansible.module_utils.urls import fetch_url
+from ansible.module_utils.urls import fetch_url, open_url
 
 
 DEFAULT_API_BASE = "/api/v15"
@@ -245,29 +245,45 @@ class FreeboxClient(object):
         if auth_token:
             headers["X-Fbx-App-Auth"] = auth_token
 
-        resp, info = fetch_url(
-            self.module,
-            full_url,
-            method=method,
-            data=data,
-            headers=headers,
-            timeout=self.timeout,
-            validate_certs=self.validate_certs,
-        )
-        status = info.get("status", -1)
-        # Read body — Freebox returns JSON envelope even on 4xx (e.g. 403 with error_code).
-        raw = b""
-        if resp is not None:
+        if self.module is not None:
+            # Module context: use fetch_url (handles proxies, etc. from module params).
+            resp, info = fetch_url(
+                self.module,
+                full_url,
+                method=method,
+                data=data,
+                headers=headers,
+                timeout=self.timeout,
+                validate_certs=self.validate_certs,
+            )
+            status = info.get("status", -1)
+            raw = b""
+            if resp is not None:
+                try:
+                    raw = resp.read()
+                finally:
+                    resp.close()
+            elif info.get("body"):
+                body_field = info["body"]
+                raw = body_field.encode("utf-8") if isinstance(body_field, str) else body_field
+            if status == -1:
+                raise FreeboxError("HTTP request failed: %s" % info.get("msg"))
+        else:
+            # Plugin context (inventory / lookup): use open_url directly.
             try:
+                resp = open_url(
+                    full_url,
+                    method=method,
+                    data=data,
+                    headers=headers,
+                    timeout=self.timeout,
+                    validate_certs=self.validate_certs,
+                )
+                status = resp.getcode()
                 raw = resp.read()
-            finally:
                 resp.close()
-        elif info.get("body"):
-            body_field = info["body"]
-            raw = body_field.encode("utf-8") if isinstance(body_field, str) else body_field
-
-        if status == -1:
-            raise FreeboxError("HTTP request failed: %s" % info.get("msg"))
+            except Exception as exc:
+                raise FreeboxError("HTTP request failed: %s" % exc)
 
         return status, raw
 

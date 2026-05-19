@@ -50,7 +50,14 @@ def _install_ansible_stubs():
             "freebox_api.fetch_url before triggering HTTP calls"
         )
 
+    def _stub_open_url(*args, **kwargs):
+        raise RuntimeError(
+            "open_url stub was not patched; tests must monkeypatch "
+            "freebox_api.open_url before triggering HTTP calls"
+        )
+
     urls.fetch_url = _stub_fetch_url
+    urls.open_url = _stub_open_url
     sys.modules["ansible.module_utils.urls"] = urls
     mu.urls = urls
 
