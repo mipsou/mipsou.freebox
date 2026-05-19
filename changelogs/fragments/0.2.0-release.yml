@@ -1,0 +1,33 @@
+release_summary: |
+  Wave 2–4 — full API coverage: 35 modules, 1 inventory plugin, 1 lookup plugin.
+  All modules pass ansible-test sanity, 327 unit tests green.
+
+major_changes:
+  - New modules covering the complete Freebox OS API surface — VM lifecycle,
+    NAS filesystem, DHCP, NAT/firewall, routing, WiFi, downloads, Samba, UPnP,
+    AirMedia, LCD, Wake-on-LAN, parental controls, system facts and reboot,
+    plus 8 read-only info modules (storage, VPN, switch, calls, contacts, TV,
+    shares, DynDNS).
+  - New inventory plugin ``mipsou.freebox.freebox_lan`` — generates a dynamic
+    inventory from the Freebox LAN browser, grouped by ``host_type``.
+  - New lookup plugin ``mipsou.freebox.freebox_vm`` — resolves VM names to
+    their API dict (MAC, IP, status).
+
+security_fixes:
+  - >-
+    ``mipsou.freebox.vm`` — ``cloudinit_userdata`` now has ``no_log: true``
+    to prevent cloud-init secrets from appearing in Ansible logs
+    (``CVE``-class: credential exposure in logs).
+  - >-
+    ``mipsou.freebox.vm`` — ``disk.name`` is now validated via
+    ``validate_disk_name()`` (rejects path traversal and non-qcow2/raw
+    extensions).
+  - >-
+    ``mipsou.freebox.port_forward`` — ``src_ip`` is now validated as a valid
+    IPv4 or CIDR before being sent to the API.
+  - >-
+    ``module_utils.freebox_api`` — ``decode_path`` now wraps ``binascii.Error``
+    in ``FreeboxError`` instead of propagating a bare exception.
+  - >-
+    ``module_utils.freebox_api`` — ``sanitize_path`` now explicitly rejects
+    null bytes in path strings.
