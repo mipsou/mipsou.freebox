@@ -88,6 +88,11 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _send_wol(client, ifname, mac, body=None):
+    """POST the WoL magic packet. Returns whatever the API sends back."""
+    return client.post("/lan/wol/%s/%s/" % (ifname, mac), body=body or {})
+
+
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
@@ -118,7 +123,7 @@ def main():
 
     client = FreeboxClient(module)
     try:
-        client.post("/lan/wol/%s/%s/" % (ifname, mac), body=body)
+        _send_wol(client, ifname, mac, body)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 

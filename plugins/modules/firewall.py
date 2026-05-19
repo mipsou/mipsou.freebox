@@ -96,6 +96,19 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _update_dmz(client, desired, check_mode=False):
+    """Read-modify-write the DMZ config. Returns (changed, before, after)."""
+    if desired:
+        return client.diff_and_put("/fw/dmz/", desired, full_body=False, check_mode=check_mode)
+    dmz = client.get("/fw/dmz/") or {}
+    return False, dmz, dmz
+
+
+def _collect_incoming(client):
+    """Return the list of incoming firewall rules."""
+    return client.get("/fw/incoming/") or []
+
+
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
@@ -121,22 +134,11 @@ def main():
 
     client = FreeboxClient(module)
     try:
-        if desired:
-            changed, _before, dmz = client.diff_and_put(
-                "/fw/dmz/",
-                desired,
-                full_body=False,
-                check_mode=module.check_mode,
-            )
-        else:
-            dmz = client.get("/fw/dmz/") or {}
-            changed = False
-
+        changed, _before, dmz = _update_dmz(client, desired, module.check_mode)
         result = dict(changed=changed, dmz=dmz)
 
         if module.params.get("gather_facts"):
-            incoming = client.get("/fw/incoming/") or []
-            result["ansible_facts"] = {"freebox_firewall_incoming": incoming}
+            result["ansible_facts"] = {"freebox_firewall_incoming": _collect_incoming(client)}
 
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))

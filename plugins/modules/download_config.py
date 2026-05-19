@@ -102,6 +102,14 @@ def _compute_diff(before, after, keys):
     return {k: (before.get(k), after.get(k)) for k in keys if before.get(k) != after.get(k)}
 
 
+def _update_config(client, desired, check_mode=False):
+    """Read-modify-write /downloads/config/. Returns (changed, before, after)."""
+    if desired:
+        return client.diff_and_put("/downloads/config/", desired, full_body=False, check_mode=check_mode)
+    cfg = client.get("/downloads/config/") or {}
+    return False, cfg, cfg
+
+
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
@@ -131,17 +139,7 @@ def main():
 
     client = FreeboxClient(module)
     try:
-        if desired:
-            changed, before, after = client.diff_and_put(
-                "/downloads/config/",
-                desired,
-                full_body=False,
-                check_mode=module.check_mode,
-            )
-        else:
-            after = client.get("/downloads/config/") or {}
-            before = after
-            changed = False
+        changed, before, after = _update_config(client, desired, module.check_mode)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))
 

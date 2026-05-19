@@ -1,0 +1,20 @@
+---
+minor_changes:
+  - >-
+    Add ``samba_config`` module — idempotent read-modify-write of the Freebox
+    Samba server configuration (workgroup, logon, guest account, file/print
+    sharing, SMB2) via ``PUT /samba/config/``.
+  - >-
+    Add ``upnp`` module — enable/disable UPnP IGD via ``PUT /upnp/config/``;
+    optionally returns active port mappings as
+    ``ansible_facts.freebox_upnp_rules`` (read-only).
+  - >-
+    Add ``lcd`` module — control Freebox LCD panel brightness (0–100),
+    orientation (0/90/180/270), and power state via ``PUT /lcd/config/``.
+  - >-
+    Add ``airmedia`` module — enable/disable AirMedia and set the PIN code
+    (``no_log=true``) via ``PUT /airmedia/config/``.
+  - >-
+    Add ``parental`` module — enable/disable parental control via
+    ``PUT /parental/config/``; optionally returns filter profiles as
+    ``ansible_facts.freebox_parental_filters`` (read-only).

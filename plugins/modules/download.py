@@ -109,6 +109,26 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 )
 
 
+def _collect_tasks(client):
+    """Return all current download tasks."""
+    return client.get("/downloads/") or []
+
+
+def _add_task(client, download_url):
+    """POST a new download task. Returns the created task dict."""
+    return client.post("/downloads/", body={"download_url": download_url}) or {}
+
+
+def _delete_task(client, task_id):
+    """DELETE a download task by id."""
+    client.delete("/downloads/%d" % task_id)
+
+
+def _set_task_status(client, task_id, status):
+    """PUT a status update on task_id. Returns the updated task dict."""
+    return client.put("/downloads/%d" % task_id, body={"status": status}) or {}
+
+
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
@@ -138,25 +158,24 @@ def main():
 
     try:
         if state == "facts":
-            tasks = client.get("/downloads/") or []
-            module.exit_json(changed=False, ansible_facts={"freebox_downloads": tasks})
+            module.exit_json(changed=False, ansible_facts={"freebox_downloads": _collect_tasks(client)})
 
         elif state == "present":
             if module.check_mode:
                 module.exit_json(changed=True, task={"url": module.params["url_to_download"]})
-            task = client.post("/downloads/", body={"download_url": module.params["url_to_download"]}) or {}
+            task = _add_task(client, module.params["url_to_download"])
             module.exit_json(changed=True, task=task)
 
         elif state == "absent":
             if module.check_mode:
                 module.exit_json(changed=True, task={"id": task_id})
-            client.delete("/downloads/%d" % task_id)
+            _delete_task(client, task_id)
             module.exit_json(changed=True, task={"id": task_id})
 
         else:  # stopped or downloading
             if module.check_mode:
                 module.exit_json(changed=True, task={"id": task_id, "status": state})
-            updated = client.put("/downloads/%d" % task_id, body={"status": state}) or {}
+            updated = _set_task_status(client, task_id, state)
             module.exit_json(changed=True, task=updated)
 
     except FreeboxError as exc:
