@@ -210,3 +210,26 @@ def test_ensure_absent_check_mode_does_not_delete():
     result = mod._ensure_absent(module, client, HTTPS_IDENTITY)
     assert result["changed"] is True
     assert not any(c["method"] == "DELETE" for c in client.calls)
+
+
+# ── Security: src_ip validation ──────────────────────────────────────────
+
+
+def test_validate_src_ip_accepts_empty():
+    mod._validate_src_ip("")  # must not raise
+
+
+def test_validate_src_ip_accepts_valid_cidr():
+    mod._validate_src_ip("192.168.1.0/24")  # must not raise
+
+
+def test_validate_src_ip_rejects_bad_octet():
+    import pytest
+    with pytest.raises(ValueError):
+        mod._validate_src_ip("999.999.999.999")
+
+
+def test_validate_src_ip_rejects_hostname():
+    import pytest
+    with pytest.raises(ValueError):
+        mod._validate_src_ip("evil.host/32")

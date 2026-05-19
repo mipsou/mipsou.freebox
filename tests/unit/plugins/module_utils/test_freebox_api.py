@@ -23,6 +23,7 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
     as_list,
     decode_path,
     encode_path,
+    parse_ipv4,
     sanitize_path,
     validate_dhcp_ip,
     validate_disk_name,
@@ -127,6 +128,26 @@ def test_sanitize_path_rejects_empty_and_root():
 
 def test_sanitize_path_collapses_double_slashes():
     assert sanitize_path("//Disque 1//VMs/") == "/Disque 1/VMs"
+
+
+def test_sanitize_path_rejects_null_bytes():
+    with pytest.raises(ValueError, match="null"):
+        sanitize_path("/Disque 1/\x00evil")
+
+
+def test_decode_path_raises_freebox_error_on_bad_base64():
+    with pytest.raises(FreeboxError):
+        decode_path("!!!not_base64!!!")
+
+
+def test_parse_ipv4_rejects_out_of_range_octet():
+    with pytest.raises(ValueError):
+        parse_ipv4("999.0.0.1")
+
+
+def test_parse_ipv4_rejects_non_dotted():
+    with pytest.raises(ValueError):
+        parse_ipv4("192168001001")
 
 
 # ── HMAC challenge ───────────────────────────────────────────────────────

@@ -202,6 +202,7 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
     decode_path,
     encode_path,
     sanitize_path,
+    validate_disk_name,
 )
 
 
@@ -332,9 +333,10 @@ def _validate_disk_spec(module):
         source_image = sanitize_path(disk["source_image"])
     except ValueError as exc:
         module.fail_json(msg="invalid disk path: %s" % exc)
-    name = disk["name"]
-    if "/" in name or "\\" in name:
-        module.fail_json(msg="disk.name must be a bare filename, not a path")
+    try:
+        name = validate_disk_name(disk["name"])
+    except ValueError as exc:
+        module.fail_json(msg="invalid disk.name: %s" % exc)
     return source_image, dst_dir, name
 
 
@@ -483,30 +485,33 @@ def _ensure_present(module, client):
     return result
 
 
+_MODULE_ARGSPEC = dict(
+    name=dict(type="str", required=True),
+    state=dict(type="str", default="present", choices=["present", "absent"]),
+    started=dict(type="bool", default=True),
+    vcpus=dict(type="int"),
+    memory=dict(type="int"),
+    os=dict(type="str", default="unknown", choices=["fedora", "debian", "ubuntu", "unknown"]),
+    enable_screen=dict(type="bool", default=False),
+    disk=dict(type="dict", options=dict(
+        source_image=dict(type="path", required=True),
+        name=dict(type="str", required=True),
+        dir=dict(type="path", required=True),
+    )),
+    cloudinit_file=dict(type="path"),
+    cloudinit_userdata=dict(type="str", no_log=True),
+    force_recreate=dict(type="bool", default=False),
+    delete_disk=dict(type="bool", default=False),
+    stop_timeout=dict(type="int", default=60),
+    start_timeout=dict(type="int", default=30),
+    force_kill=dict(type="bool", default=False),
+    task_timeout=dict(type="int", default=600),
+)
+
+
 def main():
     argspec = dict(COMMON_ARGSPEC)
-    argspec.update(dict(
-        name=dict(type="str", required=True),
-        state=dict(type="str", default="present", choices=["present", "absent"]),
-        started=dict(type="bool", default=True),
-        vcpus=dict(type="int"),
-        memory=dict(type="int"),
-        os=dict(type="str", default="unknown", choices=["fedora", "debian", "ubuntu", "unknown"]),
-        enable_screen=dict(type="bool", default=False),
-        disk=dict(type="dict", options=dict(
-            source_image=dict(type="path", required=True),
-            name=dict(type="str", required=True),
-            dir=dict(type="path", required=True),
-        )),
-        cloudinit_file=dict(type="path"),
-        cloudinit_userdata=dict(type="str"),
-        force_recreate=dict(type="bool", default=False),
-        delete_disk=dict(type="bool", default=False),
-        stop_timeout=dict(type="int", default=60),
-        start_timeout=dict(type="int", default=30),
-        force_kill=dict(type="bool", default=False),
-        task_timeout=dict(type="int", default=600),
-    ))
+    argspec.update(_MODULE_ARGSPEC)
 
     module = AnsibleModule(
         argument_spec=argspec,

@@ -1,0 +1,23 @@
+---
+security_fixes:
+  - >-
+    ``vm``: ``cloudinit_userdata`` was missing ``no_log=True``; cloud-init
+    payloads often contain passwords, SSH keys, and vault tokens that would
+    appear in plain text in Ansible logs. (CVE-like: information disclosure)
+  - >-
+    ``vm``: ``disk.name`` was validated with a bare path-separator check;
+    now uses ``validate_disk_name()`` which additionally rejects ``..``
+    and enforces ``.qcow2``/``.raw`` extensions. (CVE-like: path traversal)
+  - >-
+    ``port_forward``: ``src_ip`` was forwarded to the Freebox API without
+    validation; now validated as a literal IPv4 (host part of optional CIDR)
+    using the public ``parse_ipv4()`` helper. (CVE-like: untrusted input)
+  - >-
+    ``module_utils/freebox_api``: ``decode_path()`` raised a bare
+    ``binascii.Error`` on malformed API responses; now raises ``FreeboxError``
+    for consistent error handling. (CVE-like: unexpected crash on
+    attacker-controlled data)
+bugfixes:
+  - >-
+    ``module_utils/freebox_api``: ``sanitize_path()`` now rejects null bytes
+    (``\\x00``) in addition to path traversal sequences.

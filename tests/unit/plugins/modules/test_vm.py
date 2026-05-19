@@ -261,3 +261,39 @@ def test_present_existing_vm_with_drift_warns_but_only_reconciles_started():
     assert len(starts) == 1
     assert creates == []
     assert puts == []
+
+
+# ── Security ─────────────────────────────────────────────────────────────
+
+
+def test_cloudinit_userdata_has_no_log():
+    """cloudinit_userdata contains passwords/keys — must be flagged no_log."""
+    spec = vm_module._MODULE_ARGSPEC["cloudinit_userdata"]
+    assert spec.get("no_log") is True
+
+
+def test_validate_disk_spec_rejects_path_traversal():
+    """disk.name with '..' must be rejected before reaching the API."""
+    import pytest
+    params = _base_params(disk=dict(
+        source_image="/Disque 1/VMs/base.qcow2",
+        name="../../../etc/passwd",
+        dir="/Disque 1/VMs",
+    ))
+    module = StubModule(params)
+    with pytest.raises(SystemExit):
+        vm_module._validate_disk_spec(module)
+    assert module.failures
+
+
+def test_validate_disk_spec_rejects_no_extension():
+    """disk.name without .qcow2/.raw extension must be rejected."""
+    import pytest
+    params = _base_params(disk=dict(
+        source_image="/Disque 1/VMs/base.qcow2",
+        name="my-disk",
+        dir="/Disque 1/VMs",
+    ))
+    module = StubModule(params)
+    with pytest.raises(SystemExit):
+        vm_module._validate_disk_spec(module)

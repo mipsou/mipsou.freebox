@@ -67,7 +67,10 @@ def encode_path(path):
 
 def decode_path(encoded):
     """Inverse of :func:`encode_path`."""
-    return base64.b64decode(encoded.encode("ascii")).decode("utf-8")
+    try:
+        return base64.b64decode(encoded.encode("ascii")).decode("utf-8")
+    except Exception as exc:
+        raise FreeboxError("cannot decode path %r: %s" % (encoded, exc))
 
 
 def as_list(value):
@@ -106,7 +109,7 @@ def validate_port(port, name="port"):
     return n
 
 
-def _parse_ipv4(ip):
+def parse_ipv4(ip):
     """Return a 4-tuple of octets for a valid IPv4 dotted-decimal address.
 
     Raises ``ValueError`` for anything else (non-string, wrong segment count,
@@ -132,7 +135,7 @@ def _parse_ipv4(ip):
 
 def validate_rfc1918(ip):
     """Ensure ``ip`` is a literal IPv4 in RFC1918 private space. Raises ``ValueError``."""
-    octets = _parse_ipv4(ip)
+    octets = parse_ipv4(ip)
     a, b = octets[0], octets[1]
     in_private = (
         a == 10
@@ -188,6 +191,8 @@ def sanitize_path(path):
     """
     if path is None or path == "":
         raise ValueError("path is required")
+    if "\x00" in path:
+        raise ValueError("path must not contain null bytes")
     if ".." in path.split("/"):
         raise ValueError("path traversal ('..') is not allowed")
     if not path.startswith("/"):
@@ -302,6 +307,7 @@ class FreeboxClient(object):
         return (env.get("result") or {}).get("session_token", "")
 
     def _sign(self, challenge):
+        # SHA-1 is Freebox-API-mandated (HMAC challenge)
         return hmac.new(
             self.app_token.encode("ascii"),
             challenge.encode("ascii"),

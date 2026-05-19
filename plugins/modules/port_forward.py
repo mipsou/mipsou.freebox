@@ -143,9 +143,16 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
     COMMON_ARGSPEC,
     FreeboxClient,
     FreeboxError,
+    parse_ipv4,
     validate_port,
     validate_rfc1918,
 )
+
+
+def _validate_src_ip(src_ip):
+    """Raise ValueError if src_ip is non-empty and its host part is not a valid IPv4."""
+    if src_ip:
+        parse_ipv4(src_ip.split("/")[0])
 
 
 def _identity(rule):
@@ -262,6 +269,10 @@ def main():
             module.fail_json(msg=str(exc))
 
     src_ip = module.params.get("src_ip") or ""
+    try:
+        _validate_src_ip(src_ip)
+    except ValueError as exc:
+        module.fail_json(msg="invalid src_ip: %s" % exc)
     identity = (module.params["ip_proto"], wan_start, wan_end, src_ip)
 
     desired = dict(
