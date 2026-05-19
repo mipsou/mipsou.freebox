@@ -96,7 +96,7 @@ def test_find_host_case_insensitive():
     """MAC lookup normalises case — "DE:AD:BE:EF:00:01" must match "de:ad:be:ef:00:01"."""
     upper_mac_host = _make_host("DE:AD:BE:EF:00:01")
     client = RecordingClient(hosts=[upper_mac_host])
-    host, _ = mod._find_host_by_mac(client, "de:ad:be:ef:00:01")
+    host, _ignored = mod._find_host_by_mac(client, "de:ad:be:ef:00:01")
     assert host is not None
 
 

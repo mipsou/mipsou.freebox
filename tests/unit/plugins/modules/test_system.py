@@ -7,11 +7,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-import pytest
-
-from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
-    FreeboxClient,
-)
 from ansible_collections.mipsou.freebox.plugins.modules import system as mod
 
 

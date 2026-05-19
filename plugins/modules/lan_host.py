@@ -24,16 +24,11 @@ description:
   - This module does not create or delete hosts. The Freebox manages the device
     lifecycle automatically (devices appear when they connect and persist until
     manually removed from the UI).
-  - Known C(host_type) values as of firmware 4.9.18.1 (27 total, source of truth
-    is the Freebox API — list may evolve with firmware updates):
-    C(workstation), C(laptop), C(smartphone), C(tablet), C(printer),
-    C(vg_console), C(television), C(multimedia_device),
-    C(nas), C(networking_device),
-    C(ip_camera), C(ip_phone),
-    C(freebox_player), C(freebox_hd), C(freebox_crystal), C(freebox_mini),
-    C(freebox_delta), C(freebox_one), C(freebox_pop),
-    C(thermostat), C(light), C(watch), C(shutter), C(outlet),
-    C(car), C(appliances), C(other).
+  - The Freebox API defines 27 known C(host_type) values (source of truth is
+    the firmware — the list may evolve). Common values include C(workstation),
+    C(laptop), C(smartphone), C(tablet), C(printer), C(nas),
+    C(networking_device), C(television), C(multimedia_device),
+    C(freebox_delta), and C(other).
 options:
   mac:
     description:

@@ -46,7 +46,6 @@ options:
       - Application token (secret).
     type: str
     required: true
-    secret: true
     env:
       - name: FREEBOX_APP_TOKEN
   api_base:

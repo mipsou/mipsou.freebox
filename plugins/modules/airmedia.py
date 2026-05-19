@@ -30,7 +30,6 @@ options:
       - PIN code required to connect to the AirMedia receiver. Set to empty
         string to disable PIN authentication.
     type: str
-    no_log: true
 author:
   - Mipsou (@mipsou)
 """

@@ -39,7 +39,6 @@ options:
       - Optional SecureOn password (6-octet hex, same format as a MAC address).
         Sent as-is; required only when the target NIC supports SecureOn.
     type: str
-    no_log: true
 author:
   - Mipsou (@mipsou)
 """

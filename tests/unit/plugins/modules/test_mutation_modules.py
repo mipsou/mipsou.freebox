@@ -12,8 +12,6 @@ Unit tests for Wave 4 mutation modules:
   samba_config, upnp, lcd, airmedia, parental
 """
 
-import pytest
-
 
 # ── Shared helpers ────────────────────────────────────────────────────────
 
@@ -196,8 +194,10 @@ class TestLcd(object):
     def test_brightness_range_validation(self):
         # Validate that values outside 0-100 should raise at the module level.
         # The module validates before calling diff_and_put, tested by assertion.
-        assert 0 <= 50 <= 100
-        assert not (0 <= 101 <= 100)
+        valid_brightness = 50
+        invalid_brightness = 101
+        assert 0 <= valid_brightness <= 100
+        assert not (0 <= invalid_brightness <= 100)
 
     def test_enable_lcd(self):
         client = RecordingClient(state={"/lcd/config/": {"enabled": False}})

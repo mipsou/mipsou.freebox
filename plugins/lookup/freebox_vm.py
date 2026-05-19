@@ -42,7 +42,6 @@ options:
       - Application token (secret).
     type: str
     required: true
-    secret: true
   api_base:
     description:
       - API path prefix.
