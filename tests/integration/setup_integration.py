@@ -49,11 +49,9 @@ public class WC {
 }
 '@
 Add-Type -TypeDefinition $code
-$r = [WC]::Get("{target}")
-if ($r) {{ "{sep}" + $r[0] + "{sep}" + $r[1] + "{sep}" }}
-""".format(
-    target=_CRED_TARGET, sep="|||"
-)
+$r = [WC]::Get("%(target)s")
+if ($r) { "%(sep)s" + $r[0] + "%(sep)s" + $r[1] + "%(sep)s" }
+""" % {"target": _CRED_TARGET, "sep": "|||"})
 
 
 def _is_wsl():
