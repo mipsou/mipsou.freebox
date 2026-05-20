@@ -72,7 +72,7 @@ public class WC {
     }
     [DllImport("advapi32",EntryPoint="CredReadW",CharSet=CharSet.Unicode,SetLastError=true)]
     public static extern bool Read(string t,int typ,int f,out IntPtr c);
-    [DllImport("advapi32",SetLastError=true)] public static extern void Free(IntPtr c);
+    [DllImport("advapi32",EntryPoint="CredFree",SetLastError=true)] public static extern void Free(IntPtr c);
     public static string[] Get(string t){
         IntPtr p; if(!Read(t,1,0,out p)) return null;
         var c=(CRED)Marshal.PtrToStructure(p,typeof(CRED));
