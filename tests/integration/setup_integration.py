@@ -106,8 +106,11 @@ def _write_config(app_id, app_token):
 
 
 def _encrypt_and_cleanup():
+    _vault_password_file = os.path.join(_SCRIPT_DIR, "get_vault_password.py")
     result = subprocess.run(
-        ["ansible-vault", "encrypt", "--ask-vault-pass", _CONFIG_FILE]
+        ["ansible-vault", "encrypt",
+         "--vault-password-file", _vault_password_file,
+         _CONFIG_FILE]
     )
     if result.returncode != 0:
         sys.stderr.write("ERROR: ansible-vault encrypt failed.\n")
