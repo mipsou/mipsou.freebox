@@ -100,8 +100,8 @@ def _read_windows(ps_exe="powershell"):
     finally:
         os.unlink(ps1)
     if result.returncode != 0 or "|||" not in result.stdout:
-        return None
-    return result.stdout.strip().split("|||")[1]
+            return ""  # not found → default empty
+        return result.stdout.strip().split("|||")[1]
 
 
 def _read_linux():
@@ -111,7 +111,7 @@ def _read_linux():
     )
     if result.returncode == 0:
         return result.stdout.rstrip("\n")
-    return None
+    return ""  # not found → default empty
 
 
 def _read_macos():
@@ -122,7 +122,7 @@ def _read_macos():
     )
     if result.returncode == 0:
         return result.stdout.rstrip("\n")
-    return None
+    return ""  # not found → default empty
 
 
 # ── store-hint per platform ───────────────────────────────────────────────
