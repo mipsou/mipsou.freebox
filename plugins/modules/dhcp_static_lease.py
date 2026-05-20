@@ -25,8 +25,8 @@ options:
     description:
       - MAC address of the host receiving the static lease. Accepts colon or
         dash separators; canonicalised to lowercase colon form internally.
+      - Required when I(gather_facts=false).
     type: str
-    required: true
   ip:
     description:
       - Reserved IPv4 address. Must be in RFC1918 private space and not end
@@ -50,6 +50,12 @@ options:
     type: str
     choices: [present, absent]
     default: present
+  gather_facts:
+    description:
+      - When C(true), return all static leases as
+        C(ansible_facts.freebox_dhcp_static_leases). I(mac) is not required.
+    type: bool
+    default: false
 author:
   - Mipsou (@mipsou)
 """
@@ -81,7 +87,7 @@ lease:
       previous state when I(state=absent). Empty when no lease existed and
       I(state=absent).
   type: dict
-  returned: always
+  returned: when not gather_facts
   sample:
     id: "DE:AD:BE:EF:00:01"
     mac: "de:ad:be:ef:00:01"
@@ -92,6 +98,14 @@ changed:
   description: Whether the Freebox state was modified.
   type: bool
   returned: always
+ansible_facts:
+  description: Populated when I(gather_facts=true).
+  type: dict
+  returned: when gather_facts=true
+  contains:
+    freebox_dhcp_static_leases:
+      description: List of all DHCP static lease dicts.
+      type: list
 """
 
 from ansible.module_utils.basic import AnsibleModule
@@ -158,18 +172,29 @@ def _ensure_absent(module, client, mac):
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
-        mac=dict(type="str", required=True),
+        mac=dict(type="str"),
         ip=dict(type="str"),
         hostname=dict(type="str"),
         comment=dict(type="str"),
         state=dict(type="str", default="present", choices=["present", "absent"]),
+        gather_facts=dict(type="bool", default=False),
     ))
 
     module = AnsibleModule(
         argument_spec=argspec,
         supports_check_mode=True,
-        required_if=[("state", "present", ["ip"])],
+        required_if=[("gather_facts", False, ["mac"])],
     )
+
+    client = FreeboxClient(module)
+
+    if module.params.get("gather_facts"):
+        try:
+            leases = client.get("/dhcp/static_lease/") or []
+        except FreeboxError as exc:
+            module.fail_json(msg=str(exc))
+        module.exit_json(changed=False, ansible_facts={"freebox_dhcp_static_leases": leases})
+        return
 
     try:
         mac = validate_mac(module.params["mac"])
@@ -183,13 +208,14 @@ def main():
         except ValueError as exc:
             module.fail_json(msg="invalid ip: %s" % exc)
 
-    client = FreeboxClient(module)
     state = module.params["state"]
 
     try:
         if state == "absent":
             result = _ensure_absent(module, client, mac)
         else:
+            if ip is None:
+                module.fail_json(msg="ip is required when state=present")
             desired = dict(
                 ip=ip,
                 hostname=module.params.get("hostname"),

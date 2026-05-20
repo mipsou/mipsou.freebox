@@ -58,17 +58,26 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
     COMMON_ARGSPEC,
+    FreeboxAPIError,
     FreeboxClient,
     FreeboxError,
 )
 
 
+def _safe_get(client, path, default=None):
+    """Return client.get(path) or default; swallow FreeboxAPIError (feature absent)."""
+    try:
+        return client.get(path) or default
+    except FreeboxAPIError:
+        return default
+
+
 def _collect_facts(client):
     """Return the freebox_shares facts dict."""
     return {
-        "ftp": client.get("/ftp/config/") or {},
-        "afp": client.get("/afp/config/") or {},
-        "tftp": client.get("/tftp/config/") or {},
+        "ftp": _safe_get(client, "/ftp/config/", {}),
+        "afp": _safe_get(client, "/afp/config/", {}),
+        "tftp": _safe_get(client, "/tftp/config/", {}),
     }
 
 

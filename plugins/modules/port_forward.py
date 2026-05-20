@@ -26,15 +26,15 @@ options:
   ip_proto:
     description:
       - Transport protocol the rule applies to.
+      - Required when I(gather_facts=false).
     type: str
     choices: [tcp, udp]
-    required: true
   wan_port_start:
     description:
       - First public WAN port (1..65535). For single-port forwards, set
         I(wan_port_end) to the same value.
+      - Required when I(gather_facts=false).
     type: int
-    required: true
   wan_port_end:
     description:
       - Last public WAN port (1..65535). Defaults to I(wan_port_start) for
@@ -77,6 +77,13 @@ options:
     type: str
     choices: [present, absent]
     default: present
+  gather_facts:
+    description:
+      - When C(true), return all port-forwarding rules as
+        C(ansible_facts.freebox_port_forward_rules). I(ip_proto) and
+        I(wan_port_start) are not required.
+    type: bool
+    default: false
 author:
   - Mipsou (@mipsou)
 """
@@ -117,10 +124,18 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
+ansible_facts:
+  description: Populated when I(gather_facts=true).
+  type: dict
+  returned: when gather_facts=true
+  contains:
+    freebox_port_forward_rules:
+      description: List of all port-forward rule dicts.
+      type: list
 rule:
   description: Final state of the rule, or the previous state when I(state=absent).
   type: dict
-  returned: always
+  returned: when not gather_facts
   sample:
     id: 7
     enabled: true
@@ -220,8 +235,8 @@ def _ensure_absent(module, client, identity):
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
-        ip_proto=dict(type="str", required=True, choices=["tcp", "udp"]),
-        wan_port_start=dict(type="int", required=True),
+        ip_proto=dict(type="str", choices=["tcp", "udp"]),
+        wan_port_start=dict(type="int"),
         wan_port_end=dict(type="int"),
         lan_ip=dict(type="str"),
         lan_port=dict(type="int"),
@@ -229,13 +244,23 @@ def main():
         enabled=dict(type="bool", default=True),
         comment=dict(type="str"),
         state=dict(type="str", default="present", choices=["present", "absent"]),
+        gather_facts=dict(type="bool", default=False),
     ))
 
     module = AnsibleModule(
         argument_spec=argspec,
         supports_check_mode=True,
-        required_if=[("state", "present", ["lan_ip", "lan_port"])],
+        required_if=[("gather_facts", False, ["ip_proto", "wan_port_start"])],
     )
+
+    if module.params.get("gather_facts"):
+        client = FreeboxClient(module)
+        try:
+            rules = client.get("/fw/redir/") or []
+        except FreeboxError as exc:
+            module.fail_json(msg=str(exc))
+        module.exit_json(changed=False, ansible_facts={"freebox_port_forward_rules": rules})
+        return
 
     try:
         wan_start = validate_port(module.params["wan_port_start"], "wan_port_start")
@@ -293,6 +318,8 @@ def main():
         if state == "absent":
             result = _ensure_absent(module, client, identity)
         else:
+            if lan_ip is None or lan_port is None:
+                module.fail_json(msg="lan_ip and lan_port are required when state=present")
             result = _ensure_present(module, client, identity, desired)
     except FreeboxError as exc:
         module.fail_json(msg=str(exc))

@@ -26,9 +26,10 @@ description:
     of C(:) implies IPv6).
 options:
   ip:
-    description: Destination network address.
+    description:
+      - Destination network address.
+      - Required when I(gather_facts=false).
     type: str
-    required: true
   mask:
     description:
       - Dotted-decimal subnet mask for IPv4 routes (e.g. C(255.255.255.0)).
@@ -60,6 +61,12 @@ options:
     type: str
     choices: [present, absent]
     default: present
+  gather_facts:
+    description:
+      - When C(true), return all routes as C(ansible_facts.freebox_routes)
+        (a dict with C(ipv4) and C(ipv6) lists). I(ip) is not required.
+    type: bool
+    default: false
 author:
   - Mipsou (@mipsou)
 """
@@ -97,10 +104,18 @@ EXAMPLES = r"""
 """
 
 RETURN = r"""
+ansible_facts:
+  description: Populated when I(gather_facts=true).
+  type: dict
+  returned: when gather_facts=true
+  contains:
+    freebox_routes:
+      description: Dict with C(ipv4) and C(ipv6) lists of route dicts.
+      type: dict
 route:
   description: Final state of the route, or the previous state when I(state=absent).
   type: dict
-  returned: always
+  returned: when not gather_facts
 changed:
   description: Whether the Freebox state was modified.
   type: bool
@@ -196,22 +211,33 @@ def _ensure_absent(module, client, ip_version, identity):
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
-        ip=dict(type="str", required=True),
+        ip=dict(type="str"),
         mask=dict(type="str"),
         prefix_len=dict(type="int"),
         gw=dict(type="str"),
         ip_version=dict(type="int", choices=[4, 6]),
         enabled=dict(type="bool", default=True),
         state=dict(type="str", default="present", choices=["present", "absent"]),
+        gather_facts=dict(type="bool", default=False),
     ))
 
     module = AnsibleModule(
         argument_spec=argspec,
         supports_check_mode=True,
-        required_if=[
-            ("state", "present", ["gw"]),
-        ],
+        required_if=[("gather_facts", False, ["ip"])],
     )
+
+    if module.params.get("gather_facts"):
+        client = FreeboxClient(module)
+        try:
+            routes = {
+                "ipv4": client.get("/routing/ipv4/route/") or [],
+                "ipv6": client.get("/routing/ipv6/route/") or [],
+            }
+        except FreeboxError as exc:
+            module.fail_json(msg=str(exc))
+        module.exit_json(changed=False, ansible_facts={"freebox_routes": routes})
+        return
 
     ip = module.params["ip"]
     ip_version = module.params.get("ip_version") or _detect_ip_version(ip)
@@ -227,6 +253,8 @@ def main():
         module.fail_json(msg=str(exc))
 
     gw = module.params.get("gw")
+    if state == "present" and gw is None:
+        module.fail_json(msg="gw is required when state=present")
     if gw is not None:
         try:
             if ip_version == 4:

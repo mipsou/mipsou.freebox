@@ -11,7 +11,7 @@
     url: "{{ freebox_url }}"
     app_id: "{{ freebox_app_id }}"
     app_token: "{{ freebox_app_token }}"
-    path: "/Disque dur/ansible_test_dir"
+    path: "/Disque 1/ansible_test_dir"
     state: present
   check_mode: true
   register: fsdir_check

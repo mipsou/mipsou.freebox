@@ -59,7 +59,7 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 
 def _collect_facts(client):
     """Return the freebox_switch facts dict with per-port stats embedded."""
-    ports = client.get("/switch/port/") or []
+    ports = client.get("/switch/status/") or []
     for port in ports:
         port_id = port.get("id")
         if port_id is not None:

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh api *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('public:',not d.get\\('private'\\),'| size:',d.get\\('size'\\),'| default:',d.get\\('default_branch'\\),'| pushed:',d.get\\('pushed_at'\\),'| empty:',d.get\\('size',0\\)==0\\)\")"
+    ]
+  }
+}

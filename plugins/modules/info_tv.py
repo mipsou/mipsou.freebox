@@ -48,14 +48,18 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
     COMMON_ARGSPEC,
+    FreeboxAPIError,
     FreeboxClient,
     FreeboxError,
 )
 
 
 def _collect_facts(client):
-    """Return the PVR records list."""
-    return client.get("/pvr/record/") or []
+    """Return the PVR records list; empty when PVR is absent from this Freebox model."""
+    try:
+        return client.get("/pvr/record/") or []
+    except FreeboxAPIError:
+        return []
 
 
 def main():

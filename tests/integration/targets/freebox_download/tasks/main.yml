@@ -7,11 +7,12 @@
     url: "{{ freebox_url }}"
     app_id: "{{ freebox_app_id }}"
     app_token: "{{ freebox_app_token }}"
+    state: facts
   register: result
 
 - name: assert tasks list returned
   ansible.builtin.assert:
     that:
-      - result.tasks is defined
-      - result.tasks is iterable
+      - result.ansible_facts.freebox_downloads is defined
+      - result.ansible_facts.freebox_downloads is iterable
       - result.changed is false

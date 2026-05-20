@@ -40,10 +40,16 @@ public class WC {
     [DllImport("advapi32",EntryPoint="CredFree",SetLastError=true)]
     public static extern void Free(IntPtr c);
     public static string[] Get(string t){
-        IntPtr p; if(!Read(t,1,0,out p)) return null;
-        var c=(CRED)Marshal.PtrToStructure(p,typeof(CRED));
-        byte[] b=new byte[c.BlobSize]; Marshal.Copy(c.Blob,b,0,b.Length); Free(p);
-        return new string[]{c.UserName, Encoding.Unicode.GetString(b)};
+        IntPtr p;
+        // Try Generic (1) first, then Domain (2) — cmdkey creates Domain type.
+        foreach(int typ in new int[]{1,2}){
+            if(Read(t,typ,0,out p)){
+                var c=(CRED)Marshal.PtrToStructure(p,typeof(CRED));
+                byte[] b=new byte[c.BlobSize]; Marshal.Copy(c.Blob,b,0,b.Length); Free(p);
+                return new string[]{c.UserName, Encoding.Unicode.GetString(b)};
+            }
+        }
+        return null;
     }
 }
 '@

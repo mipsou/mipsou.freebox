@@ -13,7 +13,7 @@
   check_mode: true
   register: wol_check
 
-- name: Assert changed=false in check_mode
+- name: Assert changed=true in check_mode (packet would be sent but wasn't)
   ansible.builtin.assert:
     that:
-      - not wol_check.changed
+      - wol_check.changed

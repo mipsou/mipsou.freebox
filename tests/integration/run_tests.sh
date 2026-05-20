@@ -13,8 +13,8 @@ CFG="$SCRIPT_DIR/integration_config.yml"
 
 # Auto-generate config if needed
 if [ ! -f "$CFG" ]; then
-    echo "Config not found — running setup..."
-    python3 "$SCRIPT_DIR/setup_integration.py"
+    echo "Config not found — run: python3 tests/integration/pair_freebox.py"
+    exit 1
 fi
 
 # Targets: args or all

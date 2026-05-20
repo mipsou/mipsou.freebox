@@ -17,10 +17,12 @@ version_added: "0.2.0"
 extends_documentation_fragment:
   - mipsou.freebox.main
 description:
-  - Set the C(primary_name) and/or C(host_type) of a device visible on the Freebox
-    LAN (C(PUT /lan/browser/pub/{id})).
-  - The host is looked up by its MAC address. The Freebox assigns its own ID to each
-    discovered device — you never need to know it.
+  - Look up a LAN host by MAC address and optionally update its C(primary_name)
+    and/or C(host_type) (C(PUT /lan/browser/pub/{id})).
+  - When called with only C(mac) and no optional parameters the module performs a
+    read-only lookup and returns the current host dict with C(changed=false).
+  - The Freebox assigns its own ID to each discovered device — you never need to
+    know it.
   - This module does not create or delete hosts. The Freebox manages the device
     lifecycle automatically (devices appear when they connect and persist until
     manually removed from the UI).
@@ -137,7 +139,6 @@ def main():
     module = AnsibleModule(
         argument_spec=argspec,
         supports_check_mode=True,
-        required_one_of=[["primary_name", "host_type"]],
     )
 
     try:

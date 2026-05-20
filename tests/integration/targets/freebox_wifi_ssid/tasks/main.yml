@@ -9,7 +9,7 @@
     url: "{{ freebox_url }}"
     app_id: "{{ freebox_app_id }}"
     app_token: "{{ freebox_app_token }}"
-    ssid: "Freebox-CHANGEME"
+    name: "Freebox-CHANGEME"
     enabled: true
   check_mode: true
   register: ssid_check

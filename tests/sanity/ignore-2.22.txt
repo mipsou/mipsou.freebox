@@ -1,3 +1,7 @@
 scripts/pair.py shebang
 scripts/pair.py pep8!skip
 scripts/pair.py pylint!skip
+tests/integration/pair_freebox.py pylint!skip
+tests/integration/setup_integration.py pylint!skip
+tests/integration/pair_freebox.py shebang
+tests/integration/setup_integration.py shebang

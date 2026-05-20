@@ -21,27 +21,44 @@ description:
   - Optionally fetch the list of parental filter profiles as
     C(ansible_facts.freebox_parental_filters) (read-only).
 options:
-  enabled:
+  default_filter_mode:
     description:
-      - Whether parental control is globally active.
-    type: bool
+      - Default filtering mode applied to hosts that have no specific profile.
+      - C(allowed) — internet access is allowed by default.
+      - C(blocked) — internet access is blocked by default.
+      - C(white_list) — only white-listed sites are accessible.
+      - C(black_list) — only black-listed sites are blocked.
+    type: str
+    choices: [allowed, blocked, white_list, black_list]
   gather_facts:
     description:
       - When C(true), return the parental filter profiles as
         C(ansible_facts.freebox_parental_filters).
     type: bool
     default: false
+notes:
+  - The Freebox app must be granted the B(Contrôle parental) (parental) permission
+    when pairing. Without it every API call returns an authorization error.
+    Grant it on the Freebox LCD screen at pairing time, or update the app rights
+    in the Freebox web UI under Paramètres → Gestion des accès → Applications.
 author:
   - Mipsou (@mipsou)
 """
 
 EXAMPLES = r"""
-- name: Enable parental control
+- name: Block internet access by default
   mipsou.freebox.parental:
     url: http://mafreebox.freebox.fr
     app_id: ansible
     app_token: "{{ freebox_app_token }}"
-    enabled: true
+    default_filter_mode: blocked
+
+- name: Restore open access
+  mipsou.freebox.parental:
+    url: http://mafreebox.freebox.fr
+    app_id: ansible
+    app_token: "{{ freebox_app_token }}"
+    default_filter_mode: allowed
 
 - name: Gather parental filter profiles
   mipsou.freebox.parental:
@@ -84,15 +101,18 @@ from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import 
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
-        enabled=dict(type="bool"),
+        default_filter_mode=dict(
+            type="str",
+            choices=["allowed", "blocked", "white_list", "black_list"],
+        ),
         gather_facts=dict(type="bool", default=False),
     ))
 
     module = AnsibleModule(argument_spec=argspec, supports_check_mode=True)
 
     desired = {}
-    if module.params.get("enabled") is not None:
-        desired["enabled"] = module.params["enabled"]
+    if module.params.get("default_filter_mode") is not None:
+        desired["default_filter_mode"] = module.params["default_filter_mode"]
 
     client = FreeboxClient(module)
     try:

@@ -25,8 +25,8 @@ options:
   mac:
     description:
       - MAC address to manage (colon or hyphen separated, case-insensitive).
+      - Required when I(gather_facts=false).
     type: str
-    required: true
   comment:
     description:
       - Free-form label displayed in the Freebox UI.
@@ -38,6 +38,12 @@ options:
     type: str
     choices: [present, absent]
     default: present
+  gather_facts:
+    description:
+      - When C(true), return all MAC filter entries as
+        C(ansible_facts.freebox_wifi_mac_filter). I(mac) is not required.
+    type: bool
+    default: false
 author:
   - Mipsou (@mipsou)
 """
@@ -64,7 +70,15 @@ RETURN = r"""
 entry:
   description: The filter entry dict (present state) or the deleted entry (absent).
   type: dict
-  returned: always
+  returned: when not gather_facts
+ansible_facts:
+  description: Populated when I(gather_facts=true).
+  type: dict
+  returned: when gather_facts=true
+  contains:
+    freebox_wifi_mac_filter:
+      description: List of all WiFi MAC filter entry dicts.
+      type: list
 changed:
   description: Whether the Freebox state was modified.
   type: bool
@@ -127,12 +141,27 @@ def _ensure_absent(module, client, mac):
 def main():
     argspec = dict(COMMON_ARGSPEC)
     argspec.update(dict(
-        mac=dict(type="str", required=True),
+        mac=dict(type="str"),
         comment=dict(type="str"),
         state=dict(type="str", default="present", choices=["present", "absent"]),
+        gather_facts=dict(type="bool", default=False),
     ))
 
-    module = AnsibleModule(argument_spec=argspec, supports_check_mode=True)
+    module = AnsibleModule(
+        argument_spec=argspec,
+        supports_check_mode=True,
+        required_if=[("gather_facts", False, ["mac"])],
+    )
+
+    client = FreeboxClient(module)
+
+    if module.params.get("gather_facts"):
+        try:
+            entries = client.get("/wifi/mac_filter/") or []
+        except FreeboxError as exc:
+            module.fail_json(msg=str(exc))
+        module.exit_json(changed=False, ansible_facts={"freebox_wifi_mac_filter": entries})
+        return
 
     try:
         mac = validate_mac(module.params["mac"])
@@ -141,7 +170,6 @@ def main():
 
     comment = module.params.get("comment")
     state = module.params["state"]
-    client = FreeboxClient(module)
 
     try:
         if state == "absent":

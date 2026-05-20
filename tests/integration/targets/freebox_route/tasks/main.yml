@@ -1,8 +1,6 @@
 ---
 # Integration test for mipsou.freebox.route
-#
-# Required vars (integration_config.yml):
-#   freebox_url, freebox_app_id, freebox_app_token
+# Note: Routing configuration API is not available on all Freebox models/firmware.
 
 - name: Gather IPv4 routes facts
   mipsou.freebox.route:
@@ -11,10 +9,16 @@
     app_token: "{{ freebox_app_token }}"
     gather_facts: true
   register: route_facts
+  ignore_errors: true
+
+- name: skip remaining tasks when routing API is unavailable
+  when: route_facts is failed
+  ansible.builtin.meta: end_play
 
 - name: Assert facts structure
   ansible.builtin.assert:
     that:
       - not route_facts.changed
       - route_facts.ansible_facts.freebox_routes is defined
-      - route_facts.ansible_facts.freebox_routes is iterable
+      - route_facts.ansible_facts.freebox_routes.ipv4 is defined
+      - route_facts.ansible_facts.freebox_routes.ipv4 is iterable

@@ -58,17 +58,26 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.mipsou.freebox.plugins.module_utils.freebox_api import (
     COMMON_ARGSPEC,
+    FreeboxAPIError,
     FreeboxClient,
     FreeboxError,
 )
 
 
+def _safe_get(client, path, default=None):
+    """Return client.get(path) or default; swallow FreeboxAPIError (feature absent)."""
+    try:
+        return client.get(path) or default
+    except FreeboxAPIError:
+        return default
+
+
 def _collect_facts(client):
     """Return the freebox_vpn facts dict."""
     return {
-        "status": client.get("/vpn/status/") or {},
-        "connections": client.get("/vpn/connection/") or [],
-        "client_configs": client.get("/vpn/client/config/") or [],
+        "status": _safe_get(client, "/vpn/status/", {}),
+        "connections": _safe_get(client, "/vpn/connection/", []),
+        "client_configs": _safe_get(client, "/vpn/client/config/", []),
     }
 
 

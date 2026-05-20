@@ -16,13 +16,14 @@
     that:
       - not parental_read.changed
       - parental_read.config is defined
+      - parental_read.config.default_filter_mode is defined
 
-- name: Noop — set enabled to current value
+- name: Noop — set default_filter_mode to current value
   mipsou.freebox.parental:
     url: "{{ freebox_url }}"
     app_id: "{{ freebox_app_id }}"
     app_token: "{{ freebox_app_token }}"
-    enabled: "{{ parental_read.config.enabled }}"
+    default_filter_mode: "{{ parental_read.config.default_filter_mode }}"
   register: parental_noop
 
 - name: Assert noop is unchanged
@@ -30,12 +31,12 @@
     that:
       - not parental_noop.changed
 
-- name: Check-mode toggle enabled
+- name: Check-mode toggle default_filter_mode
   mipsou.freebox.parental:
     url: "{{ freebox_url }}"
     app_id: "{{ freebox_app_id }}"
     app_token: "{{ freebox_app_token }}"
-    enabled: "{{ not parental_read.config.enabled }}"
+    default_filter_mode: "{{ 'blocked' if parental_read.config.default_filter_mode == 'allowed' else 'allowed' }}"
   check_mode: true
   register: parental_toggle
 
@@ -54,7 +55,7 @@
 - name: Assert state still matches original
   ansible.builtin.assert:
     that:
-      - parental_post.config.enabled == parental_read.config.enabled
+      - parental_post.config.default_filter_mode == parental_read.config.default_filter_mode
 
 - name: Gather parental filters facts
   mipsou.freebox.parental:

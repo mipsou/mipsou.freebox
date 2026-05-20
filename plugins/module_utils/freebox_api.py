@@ -11,6 +11,7 @@ import base64
 import hashlib
 import hmac
 import json
+import posixpath
 import re
 import time
 
@@ -246,13 +247,8 @@ class FreeboxClient(object):
             headers["X-Fbx-App-Auth"] = auth_token
 
         if self.module is not None:
-            # Module context: use fetch_url (handles proxies, etc. from module params).
             resp, info = fetch_url(
-                self.module,
-                full_url,
-                method=method,
-                data=data,
-                headers=headers,
+                self.module, full_url, method=method, data=data, headers=headers,
                 timeout=self.timeout,
             )
             status = info.get("status", -1)
@@ -262,7 +258,7 @@ class FreeboxClient(object):
                     raw = resp.read()
                 finally:
                     resp.close()
-            elif info.get("body"):
+            if not raw and info.get("body"):
                 body_field = info["body"]
                 raw = body_field.encode("utf-8") if isinstance(body_field, str) else body_field
             if status == -1:
@@ -308,7 +304,7 @@ class FreeboxClient(object):
         body = {"app_id": self.app_id, "password": password}
         status, raw = self._fetch("POST", full, body=body)
         try:
-            env = json.loads(raw.decode("utf-8"))
+            env = json.loads(raw.decode("utf-8")) if raw else {}
         except ValueError:
             raise FreeboxError("invalid JSON from /login/session/ (status %d)" % status)
         if not env.get("success"):
@@ -395,16 +391,34 @@ class FreeboxClient(object):
     def path_exists(self, abs_path):
         """Return the FSInfo dict if ``abs_path`` exists on the Freebox NAS, else None.
 
-        ``abs_path`` must be a cleartext absolute path; it is base64-encoded
-        internally before the GET /fs/info/ call.
+        Lists the parent directory via ``GET /fs/ls/<base64>`` (path as URL segment)
+        and looks for the target entry by name.
+
+        Note: the Freebox firmware ignores the ``?path=`` query parameter on both
+        ``/fs/info/`` and ``/fs/ls/``; the encoded path must be a URL segment.
         """
-        encoded = encode_path(abs_path)
+        clean = abs_path.rstrip("/")
+        parent = posixpath.dirname(clean)
+        name = posixpath.basename(clean)
+        if not name:
+            # Should not happen after sanitize_path, but guard defensively.
+            return None
+        if not parent:
+            parent = "/"
         try:
-            return self.get("/fs/info/", query={"path": encoded})
+            entries = self.get("/fs/ls/" + encode_path(parent)) or []
         except FreeboxAPIError as exc:
-            if exc.error_code in ("path_not_found", "no_such_file", "not_found"):
+            if exc.error_code in ("path_not_found", "no_such_file", "not_found", "noent",
+                                  "invalid_request"):
                 return None
             raise
+        # v15 wraps the list in {"entries": [...]}; older versions return a bare list.
+        if isinstance(entries, dict):
+            entries = entries.get("entries", [])
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("name") == name:
+                return entry
+        return None
 
     def poll_fs_task(self, task_id, timeout=120, interval=1.0):
         """Poll /fs/tasks/{id} until the task finishes. Returns the final task dict.
