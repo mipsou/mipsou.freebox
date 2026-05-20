@@ -1,72 +1,66 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Ansible vault-password-file script.
+Ansible vault-password-file script — cross-platform.
 
-Reads the vault password from Windows Credential Manager.
+Reads the vault password from the OS secret store:
+  Windows  : Windows Credential Manager  (via python-keyring)
+  Linux    : libsecret / GNOME Keyring   (via python-keyring + SecretService)
+  macOS    : Keychain                    (via python-keyring)
 
 Store the vault password once (run yourself, never via an AI):
-    cmdkey /add:community-freebox-vault /user:vault /pass:<your-vault-password>
 
-Usage with ansible-vault / ansible-test:
+  Windows:
+    cmdkey /add:community-freebox-vault /user:vault /pass:<vault-password>
+
+  Linux (libsecret):
+    secret-tool store --label="community-freebox-vault" \
+      service community-freebox-vault account vault
+
+  macOS:
+    security add-generic-password -s community-freebox-vault \
+      -a vault -w <vault-password>
+
+  Or via Python (any OS):
+    python3 -c "import keyring; keyring.set_password(
+        'community-freebox-vault', 'vault', '<vault-password>')"
+
+Dependencies:
+    pip install keyring
+    # Linux also needs: pip install secretstorage  (or jeepney for DBus)
+
+Usage:
     ansible-vault encrypt --vault-password-file tests/integration/get_vault_password.py ...
     ansible-test integration --vault-password-file tests/integration/get_vault_password.py ...
 """
 
 from __future__ import print_function
 
-import ctypes
 import sys
 
-_CRED_TYPE_GENERIC = 1
+_SERVICE = "community-freebox-vault"
+_ACCOUNT = "vault"
 
-
-class _FILETIME(ctypes.Structure):
-    _fields_ = [
-        ("dwLowDateTime", ctypes.c_uint32),
-        ("dwHighDateTime", ctypes.c_uint32),
-    ]
-
-
-class _CREDENTIAL(ctypes.Structure):
-    _fields_ = [
-        ("Flags", ctypes.c_uint32),
-        ("Type", ctypes.c_uint32),
-        ("TargetName", ctypes.c_wchar_p),
-        ("Comment", ctypes.c_wchar_p),
-        ("LastWritten", _FILETIME),
-        ("CredentialBlobSize", ctypes.c_uint32),
-        ("CredentialBlob", ctypes.POINTER(ctypes.c_byte)),
-        ("Persist", ctypes.c_uint32),
-        ("AttributeCount", ctypes.c_uint32),
-        ("Attributes", ctypes.c_void_p),
-        ("TargetAlias", ctypes.c_wchar_p),
-        ("UserName", ctypes.c_wchar_p),
-    ]
-
-
-_TARGET = "community-freebox-vault"
-
-_advapi32 = ctypes.WinDLL("advapi32")
-_advapi32.CredReadW.restype = ctypes.c_bool
-_advapi32.CredReadW.argtypes = [
-    ctypes.c_wchar_p,
-    ctypes.c_uint32,
-    ctypes.c_uint32,
-    ctypes.POINTER(ctypes.POINTER(_CREDENTIAL)),
-]
-_advapi32.CredFree.argtypes = [ctypes.c_void_p]
-
-_ptr = ctypes.POINTER(_CREDENTIAL)()
-if not _advapi32.CredReadW(_TARGET, _CRED_TYPE_GENERIC, 0, ctypes.byref(_ptr)):
+try:
+    import keyring
+except ImportError:
     sys.stderr.write(
-        "ERROR: '%s' not found in Windows Credential Manager.\n"
-        "Run: cmdkey /add:%s /user:vault /pass:<vault-password>\n"
-        % (_TARGET, _TARGET)
+        "ERROR: 'keyring' not installed.\n"
+        "  pip install keyring\n"
+        "  # Linux: also pip install secretstorage\n"
     )
     sys.exit(1)
 
-_blob = bytes(_ptr.contents.CredentialBlob[: _ptr.contents.CredentialBlobSize])
-_advapi32.CredFree(_ptr)
+password = keyring.get_password(_SERVICE, _ACCOUNT)
 
-print(_blob.decode("utf-16-le"))
+if password is None:
+    sys.stderr.write(
+        "ERROR: no entry found for service=%r account=%r.\n"
+        "Store it first (empty string allowed for init):\n"
+        "  python3 -c \"import keyring; keyring.set_password(%r, %r, '')\"\n"
+        % (_SERVICE, _ACCOUNT, _SERVICE, _ACCOUNT)
+    )
+    sys.exit(1)
+
+# Empty password is allowed (vault init before rekey).
+print(password)
