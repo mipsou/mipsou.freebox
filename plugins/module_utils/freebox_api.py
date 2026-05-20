@@ -254,7 +254,6 @@ class FreeboxClient(object):
                 data=data,
                 headers=headers,
                 timeout=self.timeout,
-                validate_certs=self.validate_certs,
             )
             status = info.get("status", -1)
             raw = b""
