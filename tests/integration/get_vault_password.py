@@ -62,5 +62,20 @@ if password is None:
     )
     sys.exit(1)
 
-# Empty password is allowed (vault init before rekey).
+# Empty password is allowed for init — warn loudly and demand rekey.
+if password == "":
+    sys.stderr.write(
+        "\n"
+        "  ╔══════════════════════════════════════════════════════════╗\n"
+        "  ║  SECURITY WARNING — vault password is EMPTY             ║\n"
+        "  ║  Set a real password NOW:                               ║\n"
+        "  ║    python3 -c \"import keyring; keyring.set_password(    ║\n"
+        "  ║      'community-freebox-vault', 'vault', 'NEWPASS')\"    ║\n"
+        "  ║    ansible-vault rekey                                  ║\n"
+        "  ║      --vault-password-file get_vault_password.py        ║\n"
+        "  ║      tests/integration/integration_config.yml.vault     ║\n"
+        "  ╚══════════════════════════════════════════════════════════╝\n"
+        "\n"
+    )
+
 print(password)
