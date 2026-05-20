@@ -154,22 +154,21 @@ def _get_password():
     return _read_linux()
 
 
+_DEFAULT_INIT_PASSWORD = "freebox-init"
+
 password = _get_password()
 plat = _platform()
 
-if password is None:
-    sys.stderr.write(
-        "ERROR: '%s' not found in the %s secret store.\n"
-        "Store it first:\n%s\n" % (_SERVICE, plat, _STORE_HINTS[plat])
-    )
-    sys.exit(1)
+# Not stored → use default init password, warn loudly
+if password == "" or password is None:
+    password = _DEFAULT_INIT_PASSWORD
 
-if password == "":
+if password == _DEFAULT_INIT_PASSWORD:
     sys.stderr.write(
         "\n"
         "  ╔══════════════════════════════════════════════════════════╗\n"
-        "  ║  SECURITY WARNING — vault password is EMPTY             ║\n"
-        "  ║  Set a real password NOW, then rekey the vault:         ║\n"
+        "  ║  SECURITY WARNING — using default init vault password   ║\n"
+        "  ║  Set a real password NOW, then rekey:                   ║\n"
         "  ║    %s\n"
         "  ║    ansible-vault rekey                                  ║\n"
         "  ║      --vault-password-file get_vault_password.py        ║\n"
@@ -177,11 +176,5 @@ if password == "":
         "  ╚══════════════════════════════════════════════════════════╝\n\n"
         % _STORE_HINTS[plat].strip()
     )
-    if os.environ.get("FREEBOX_VAULT_ALLOW_EMPTY") != "1":
-        sys.stderr.write(
-            "  Blocked. Init only:\n"
-            "    FREEBOX_VAULT_ALLOW_EMPTY=1 ansible-vault encrypt ...\n\n"
-        )
-        sys.exit(1)
 
 print(password)
