@@ -62,7 +62,6 @@ if password is None:
     )
     sys.exit(1)
 
-# Empty password is allowed for init — warn loudly and demand rekey.
 if password == "":
     sys.stderr.write(
         "\n"
@@ -77,5 +76,12 @@ if password == "":
         "  ╚══════════════════════════════════════════════════════════╝\n"
         "\n"
     )
+    import os
+    if os.environ.get("FREEBOX_VAULT_ALLOW_EMPTY") != "1":
+        sys.stderr.write(
+            "  Blocked. To allow empty password during init only:\n"
+            "    FREEBOX_VAULT_ALLOW_EMPTY=1 ansible-vault encrypt ...\n\n"
+        )
+        sys.exit(1)
 
 print(password)
