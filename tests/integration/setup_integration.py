@@ -25,7 +25,8 @@ _VAULT_FILE = os.path.join(_SCRIPT_DIR, "integration_config.yml.vault")
 _CONFIG_FILE = os.path.join(_SCRIPT_DIR, "integration_config.yml")
 _CRED_TARGET = "community-freebox-ansible"
 
-_READ_CRED_PS = r"""
+_READ_CRED_PS = (
+    r"""
 $code = @'
 using System; using System.Runtime.InteropServices; using System.Text;
 public class WC {
@@ -51,7 +52,9 @@ public class WC {
 Add-Type -TypeDefinition $code
 $r = [WC]::Get("%(target)s")
 if ($r) { "%(sep)s" + $r[0] + "%(sep)s" + $r[1] + "%(sep)s" }
-""" % {"target": _CRED_TARGET, "sep": "|||"})
+"""
+    % {"target": _CRED_TARGET, "sep": "|||"}
+)
 
 
 def _is_wsl():
@@ -63,14 +66,22 @@ def _is_wsl():
 
 
 def _read_wincred():
-    ps = "powershell.exe" if _is_wsl() else "powershell"
+    wsl = _is_wsl()
+    ps = "powershell.exe" if wsl else "powershell"
     with tempfile.NamedTemporaryFile(suffix=".ps1", mode="w",
                                      delete=False, encoding="utf-8") as tf:
         tf.write(_READ_CRED_PS)
         ps1 = tf.name
+    # WSL: convert Linux path to Windows path for powershell.exe
+    if wsl:
+        win_ps1 = subprocess.check_output(
+            ["wslpath", "-w", ps1], text=True
+        ).strip()
+    else:
+        win_ps1 = ps1
     try:
         result = subprocess.run(
-            [ps, "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1],
+            [ps, "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", win_ps1],
             capture_output=True, text=True,
         )
     finally:

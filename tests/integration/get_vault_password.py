@@ -92,9 +92,15 @@ def _read_windows(ps_exe="powershell"):
                                      delete=False, encoding="utf-8") as tf:
         tf.write(_PS_SCRIPT)
         ps1 = tf.name
+    # WSL: convert Linux /tmp path to Windows path for powershell.exe
+    win_ps1 = ps1
+    if ps_exe == "powershell.exe":
+        win_ps1 = subprocess.check_output(
+            ["wslpath", "-w", ps1], text=True
+        ).strip()
     try:
         result = subprocess.run(
-            [ps_exe, "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ps1],
+            [ps_exe, "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", win_ps1],
             capture_output=True, text=True,
         )
     finally:
