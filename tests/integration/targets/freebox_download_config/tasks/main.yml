@@ -1,0 +1,57 @@
+---
+# Integration test for mipsou.freebox.download_config
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Read download config (gather only)
+  mipsou.freebox.download_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: dl_read
+
+- name: Assert read is non-mutating
+  ansible.builtin.assert:
+    that:
+      - not dl_read.changed
+      - dl_read.config is defined
+
+- name: Noop — set max_downloading_tasks to current value
+  mipsou.freebox.download_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    max_downloading_tasks: "{{ dl_read.config.max_downloading_tasks }}"
+  register: dl_noop
+
+- name: Assert noop is unchanged
+  ansible.builtin.assert:
+    that:
+      - not dl_noop.changed
+
+- name: Check-mode change max_downloading_tasks
+  mipsou.freebox.download_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    max_downloading_tasks: "{{ dl_read.config.max_downloading_tasks | int + 1 }}"
+  check_mode: true
+  register: dl_change
+
+- name: Assert check_mode signals change without writing
+  ansible.builtin.assert:
+    that:
+      - dl_change.changed
+
+- name: Post-verify — max_downloading_tasks unchanged
+  mipsou.freebox.download_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: dl_post
+
+- name: Assert value matches original
+  ansible.builtin.assert:
+    that:
+      - dl_post.config.max_downloading_tasks == dl_read.config.max_downloading_tasks

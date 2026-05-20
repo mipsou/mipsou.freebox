@@ -1,0 +1,18 @@
+---
+# Integration test for mipsou.freebox.info_shares
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather shares facts
+  mipsou.freebox.info_shares:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: shares_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not shares_facts.changed
+      - shares_facts.ansible_facts.freebox_shares is defined

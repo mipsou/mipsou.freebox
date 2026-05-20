@@ -1,0 +1,22 @@
+---
+# Integration test for mipsou.freebox.fs_directory
+#
+# check_mode only — no actual directory is created.
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Check-mode create temp directory — assert changed=true, no actual create
+  mipsou.freebox.fs_directory:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    path: "/Disque dur/ansible_test_dir"
+    state: present
+  check_mode: true
+  register: fsdir_check
+
+- name: Assert check_mode reports would-create
+  ansible.builtin.assert:
+    that:
+      - fsdir_check.changed

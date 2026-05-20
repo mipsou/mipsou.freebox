@@ -1,0 +1,72 @@
+---
+# Integration test for mipsou.freebox.parental
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Read parental config (gather only)
+  mipsou.freebox.parental:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: parental_read
+
+- name: Assert read is non-mutating
+  ansible.builtin.assert:
+    that:
+      - not parental_read.changed
+      - parental_read.config is defined
+
+- name: Noop — set enabled to current value
+  mipsou.freebox.parental:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ parental_read.config.enabled }}"
+  register: parental_noop
+
+- name: Assert noop is unchanged
+  ansible.builtin.assert:
+    that:
+      - not parental_noop.changed
+
+- name: Check-mode toggle enabled
+  mipsou.freebox.parental:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ not parental_read.config.enabled }}"
+  check_mode: true
+  register: parental_toggle
+
+- name: Assert check_mode did not write
+  ansible.builtin.assert:
+    that:
+      - parental_toggle.changed
+
+- name: Post-verify — config unchanged
+  mipsou.freebox.parental:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: parental_post
+
+- name: Assert state still matches original
+  ansible.builtin.assert:
+    that:
+      - parental_post.config.enabled == parental_read.config.enabled
+
+- name: Gather parental filters facts
+  mipsou.freebox.parental:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    gather_facts: true
+  register: parental_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not parental_facts.changed
+      - parental_facts.ansible_facts.freebox_parental_filters is defined
+      - parental_facts.ansible_facts.freebox_parental_filters is iterable

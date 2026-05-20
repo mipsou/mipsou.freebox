@@ -1,0 +1,59 @@
+---
+# Integration test for mipsou.freebox.firewall
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Read firewall config (gather only)
+  mipsou.freebox.firewall:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: fw_read
+
+- name: Assert read is non-mutating
+  ansible.builtin.assert:
+    that:
+      - not fw_read.changed
+      - fw_read.config is defined
+
+- name: Check-mode toggle DMZ enabled
+  mipsou.freebox.firewall:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    dmz_enabled: "{{ not fw_read.config.dmz_enabled }}"
+  check_mode: true
+  register: fw_toggle
+
+- name: Assert check_mode signals change without writing
+  ansible.builtin.assert:
+    that:
+      - fw_toggle.changed
+
+- name: Post-verify — DMZ state unchanged
+  mipsou.freebox.firewall:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: fw_post
+
+- name: Assert DMZ state matches original
+  ansible.builtin.assert:
+    that:
+      - fw_post.config.dmz_enabled == fw_read.config.dmz_enabled
+
+- name: Gather firewall rules facts
+  mipsou.freebox.firewall:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    gather_facts: true
+  register: fw_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not fw_facts.changed
+      - fw_facts.ansible_facts.freebox_firewall_rules is defined
+      - fw_facts.ansible_facts.freebox_firewall_rules is iterable

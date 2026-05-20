@@ -1,0 +1,20 @@
+---
+# Integration test for mipsou.freebox.dhcp_static_lease
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather DHCP static leases facts
+  mipsou.freebox.dhcp_static_lease:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    gather_facts: true
+  register: dhcp_lease_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not dhcp_lease_facts.changed
+      - dhcp_lease_facts.ansible_facts.freebox_dhcp_static_leases is defined
+      - dhcp_lease_facts.ansible_facts.freebox_dhcp_static_leases is iterable

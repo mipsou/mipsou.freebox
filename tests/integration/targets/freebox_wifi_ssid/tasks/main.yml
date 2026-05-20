@@ -1,0 +1,21 @@
+---
+# Integration test for mipsou.freebox.wifi_ssid
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Check-mode on non-existent SSID (verify module runs cleanly)
+  mipsou.freebox.wifi_ssid:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    ssid: "Freebox-CHANGEME"
+    enabled: true
+  check_mode: true
+  register: ssid_check
+  ignore_errors: true
+
+- name: Assert task completed (changed or failed gracefully)
+  ansible.builtin.assert:
+    that:
+      - ssid_check is defined

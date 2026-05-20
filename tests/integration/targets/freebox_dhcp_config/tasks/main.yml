@@ -1,0 +1,57 @@
+---
+# Integration test for mipsou.freebox.dhcp_config
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Read DHCP config (gather only)
+  mipsou.freebox.dhcp_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: dhcp_read
+
+- name: Assert read is non-mutating
+  ansible.builtin.assert:
+    that:
+      - not dhcp_read.changed
+      - dhcp_read.config is defined
+
+- name: Noop — set enabled to current value
+  mipsou.freebox.dhcp_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ dhcp_read.config.enabled }}"
+  register: dhcp_noop
+
+- name: Assert noop is unchanged
+  ansible.builtin.assert:
+    that:
+      - not dhcp_noop.changed
+
+- name: Check-mode toggle enabled (no IP range change — dangerous)
+  mipsou.freebox.dhcp_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ not dhcp_read.config.enabled }}"
+  check_mode: true
+  register: dhcp_toggle
+
+- name: Assert check_mode signals change without writing
+  ansible.builtin.assert:
+    that:
+      - dhcp_toggle.changed
+
+- name: Post-verify — enabled state unchanged
+  mipsou.freebox.dhcp_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: dhcp_post
+
+- name: Assert enabled matches original
+  ansible.builtin.assert:
+    that:
+      - dhcp_post.config.enabled == dhcp_read.config.enabled

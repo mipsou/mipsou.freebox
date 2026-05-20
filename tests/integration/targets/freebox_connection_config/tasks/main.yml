@@ -1,0 +1,20 @@
+---
+# Integration test for mipsou.freebox.connection_config
+#
+# Read-only — WAN config is sensitive, no mutation even in check_mode.
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Read connection config (gather only)
+  mipsou.freebox.connection_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: conn_read
+
+- name: Assert config is defined and unchanged
+  ansible.builtin.assert:
+    that:
+      - not conn_read.changed
+      - conn_read.config is defined

@@ -1,0 +1,20 @@
+---
+# Integration test for mipsou.freebox.port_forward
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather port forward rules facts
+  mipsou.freebox.port_forward:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    gather_facts: true
+  register: pf_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not pf_facts.changed
+      - pf_facts.ansible_facts.freebox_port_forward_rules is defined
+      - pf_facts.ansible_facts.freebox_port_forward_rules is iterable

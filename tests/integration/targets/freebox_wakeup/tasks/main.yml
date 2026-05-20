@@ -1,0 +1,19 @@
+---
+# Integration test for mipsou.freebox.wakeup
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Check-mode WoL with dummy MAC — assert no actual packet sent
+  mipsou.freebox.wakeup:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    mac: "aa:bb:cc:dd:ee:ff"
+  check_mode: true
+  register: wol_check
+
+- name: Assert changed=false in check_mode
+  ansible.builtin.assert:
+    that:
+      - not wol_check.changed

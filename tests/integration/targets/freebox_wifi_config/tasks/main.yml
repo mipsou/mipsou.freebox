@@ -1,0 +1,57 @@
+---
+# Integration test for mipsou.freebox.wifi_config
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Read WiFi config (gather only)
+  mipsou.freebox.wifi_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: wifi_read
+
+- name: Assert read is non-mutating
+  ansible.builtin.assert:
+    that:
+      - not wifi_read.changed
+      - wifi_read.config is defined
+
+- name: Noop — set enabled to current value
+  mipsou.freebox.wifi_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ wifi_read.config.enabled }}"
+  register: wifi_noop
+
+- name: Assert noop is unchanged
+  ansible.builtin.assert:
+    that:
+      - not wifi_noop.changed
+
+- name: Check-mode disable WiFi
+  mipsou.freebox.wifi_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: false
+  check_mode: true
+  register: wifi_disable
+
+- name: Assert check_mode signals change without writing
+  ansible.builtin.assert:
+    that:
+      - wifi_disable.changed
+
+- name: Post-verify — WiFi state unchanged
+  mipsou.freebox.wifi_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: wifi_post
+
+- name: Assert enabled state matches original
+  ansible.builtin.assert:
+    that:
+      - wifi_post.config.enabled == wifi_read.config.enabled

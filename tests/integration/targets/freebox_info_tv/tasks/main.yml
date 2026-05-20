@@ -1,0 +1,18 @@
+---
+# Integration test for mipsou.freebox.info_tv
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather TV facts
+  mipsou.freebox.info_tv:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: tv_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not tv_facts.changed
+      - tv_facts.ansible_facts.freebox_tv is defined

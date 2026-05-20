@@ -1,0 +1,18 @@
+---
+# Integration test for mipsou.freebox.info_storage
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather storage facts
+  mipsou.freebox.info_storage:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: storage_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not storage_facts.changed
+      - storage_facts.ansible_facts.freebox_storage is defined

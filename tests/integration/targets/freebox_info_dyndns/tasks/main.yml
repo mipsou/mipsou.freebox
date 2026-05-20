@@ -1,0 +1,19 @@
+---
+# Integration test for mipsou.freebox.info_dyndns
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather DynDNS facts
+  mipsou.freebox.info_dyndns:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: dyndns_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not dyndns_facts.changed
+      - dyndns_facts.ansible_facts.freebox_dyndns is defined
+      - dyndns_facts.ansible_facts.freebox_dyndns is iterable

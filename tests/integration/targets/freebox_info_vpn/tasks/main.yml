@@ -1,0 +1,18 @@
+---
+# Integration test for mipsou.freebox.info_vpn
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather VPN facts
+  mipsou.freebox.info_vpn:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: vpn_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not vpn_facts.changed
+      - vpn_facts.ansible_facts.freebox_vpn is defined

@@ -1,0 +1,20 @@
+---
+# Integration test for mipsou.freebox.wifi_mac_filter
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather WiFi MAC filter facts
+  mipsou.freebox.wifi_mac_filter:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    gather_facts: true
+  register: mac_filter_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not mac_filter_facts.changed
+      - mac_filter_facts.ansible_facts.freebox_wifi_mac_filter is defined
+      - mac_filter_facts.ansible_facts.freebox_wifi_mac_filter is iterable

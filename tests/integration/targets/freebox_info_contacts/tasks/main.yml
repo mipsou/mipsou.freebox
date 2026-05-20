@@ -1,0 +1,19 @@
+---
+# Integration test for mipsou.freebox.info_contacts
+#
+# Required vars (integration_config.yml):
+#   freebox_url, freebox_app_id, freebox_app_token
+
+- name: Gather contacts facts
+  mipsou.freebox.info_contacts:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: contacts_facts
+
+- name: Assert facts structure
+  ansible.builtin.assert:
+    that:
+      - not contacts_facts.changed
+      - contacts_facts.ansible_facts.freebox_contacts is defined
+      - contacts_facts.ansible_facts.freebox_contacts is iterable
