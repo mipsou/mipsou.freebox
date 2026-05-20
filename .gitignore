@@ -19,3 +19,5 @@ tests/output/
 # `build_ignore` in galaxy.yml).
 HANDOFF.md
 tests/integration/integration_config.yml
+
+tests/integration/integration_config.yml.vault
