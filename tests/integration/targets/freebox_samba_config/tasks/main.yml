@@ -1,0 +1,54 @@
+---
+# Integration test: mipsou.freebox.samba_config
+
+- name: read current samba config
+  mipsou.freebox.samba_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: samba_before
+
+- name: assert config returned
+  ansible.builtin.assert:
+    that:
+      - samba_before.config is defined
+      - samba_before.changed is false
+
+- name: set workgroup to current value — noop
+  mipsou.freebox.samba_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    workgroup: "{{ samba_before.config.workgroup }}"
+  register: noop_result
+
+- name: assert noop
+  ansible.builtin.assert:
+    that:
+      - noop_result.changed is false
+
+- name: check_mode change — no actual write
+  mipsou.freebox.samba_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    workgroup: "__CHECK__"
+  check_mode: true
+  register: check_result
+
+- name: assert check_mode reported changed
+  ansible.builtin.assert:
+    that:
+      - check_result.changed is true
+
+- name: verify workgroup not actually changed
+  mipsou.freebox.samba_config:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: verify
+
+- name: assert workgroup unchanged after check_mode
+  ansible.builtin.assert:
+    that:
+      - verify.config.workgroup == samba_before.config.workgroup

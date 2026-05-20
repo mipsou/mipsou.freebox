@@ -1,0 +1,56 @@
+---
+# Integration test: mipsou.freebox.upnp
+
+- name: read current upnp config
+  mipsou.freebox.upnp:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: upnp_before
+
+- name: assert config returned
+  ansible.builtin.assert:
+    that:
+      - upnp_before.config is defined
+      - upnp_before.changed is false
+
+- name: set enabled to current value — noop
+  mipsou.freebox.upnp:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ upnp_before.config.enabled }}"
+  register: noop_result
+
+- name: assert noop
+  ansible.builtin.assert:
+    that:
+      - noop_result.changed is false
+
+- name: toggle enabled — check_mode only
+  mipsou.freebox.upnp:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ not upnp_before.config.enabled }}"
+  check_mode: true
+  register: check_result
+
+- name: assert check_mode changed
+  ansible.builtin.assert:
+    that:
+      - check_result.changed is true
+
+- name: gather upnp rules as facts
+  mipsou.freebox.upnp:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    gather_facts: true
+  register: upnp_facts
+
+- name: assert rules fact is a list
+  ansible.builtin.assert:
+    that:
+      - upnp_facts.ansible_facts.freebox_upnp_rules is defined
+      - upnp_facts.ansible_facts.freebox_upnp_rules is iterable

@@ -1,0 +1,46 @@
+---
+# Integration test: mipsou.freebox.system
+# Run: ansible-test integration freebox_system
+
+- name: gather system facts (no reboot)
+  mipsou.freebox.system:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: result
+
+- name: assert facts structure
+  ansible.builtin.assert:
+    that:
+      - result.ansible_facts.freebox_system is defined
+      - result.ansible_facts.freebox_system.firmware_version is defined
+      - result.ansible_facts.freebox_system.mac is defined
+      - result.ansible_facts.freebox_system.board_name is defined
+      - result.changed is false
+
+- name: gather facts again — idempotence
+  mipsou.freebox.system:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: result2
+
+- name: assert idempotent
+  ansible.builtin.assert:
+    that:
+      - result2.changed is false
+
+- name: reboot check_mode — changed=true, no actual reboot
+  mipsou.freebox.system:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    reboot: true
+  check_mode: true
+  register: check_result
+
+- name: assert check_mode reboot
+  ansible.builtin.assert:
+    that:
+      - check_result.changed is true
+      - check_result.ansible_facts.freebox_system is defined

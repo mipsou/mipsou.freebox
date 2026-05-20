@@ -1,0 +1,54 @@
+---
+# Integration test: mipsou.freebox.airmedia
+
+- name: read current airmedia config
+  mipsou.freebox.airmedia:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: am_before
+
+- name: assert config returned
+  ansible.builtin.assert:
+    that:
+      - am_before.config is defined
+      - am_before.changed is false
+
+- name: set enabled to current value — noop
+  mipsou.freebox.airmedia:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ am_before.config.enabled }}"
+  register: noop_result
+
+- name: assert noop
+  ansible.builtin.assert:
+    that:
+      - noop_result.changed is false
+
+- name: toggle enabled — check_mode only
+  mipsou.freebox.airmedia:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    enabled: "{{ not am_before.config.enabled }}"
+  check_mode: true
+  register: check_result
+
+- name: assert check_mode changed
+  ansible.builtin.assert:
+    that:
+      - check_result.changed is true
+
+- name: verify enabled not changed after check_mode
+  mipsou.freebox.airmedia:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: verify
+
+- name: assert state unchanged
+  ansible.builtin.assert:
+    that:
+      - verify.config.enabled == am_before.config.enabled

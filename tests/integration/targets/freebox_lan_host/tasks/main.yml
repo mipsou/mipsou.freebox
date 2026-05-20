@@ -1,0 +1,59 @@
+---
+# Integration test: mipsou.freebox.lan_host
+# Requires freebox_test_host_mac in integration_config.yml
+
+- name: find host by mac — read current name
+  mipsou.freebox.lan_host:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    mac: "{{ freebox_test_host_mac }}"
+  register: host_before
+
+- name: assert host found
+  ansible.builtin.assert:
+    that:
+      - host_before.host is defined
+      - host_before.host.primary_name is defined
+
+- name: set same name — noop
+  mipsou.freebox.lan_host:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    mac: "{{ freebox_test_host_mac }}"
+    primary_name: "{{ host_before.host.primary_name }}"
+  register: noop_result
+
+- name: assert noop
+  ansible.builtin.assert:
+    that:
+      - noop_result.changed is false
+
+- name: rename host — check_mode only
+  mipsou.freebox.lan_host:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    mac: "{{ freebox_test_host_mac }}"
+    primary_name: "__check_mode_name__"
+  check_mode: true
+  register: check_result
+
+- name: assert check_mode changed, no actual rename
+  ansible.builtin.assert:
+    that:
+      - check_result.changed is true
+
+- name: verify name not changed after check_mode
+  mipsou.freebox.lan_host:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    mac: "{{ freebox_test_host_mac }}"
+  register: verify
+
+- name: assert name unchanged
+  ansible.builtin.assert:
+    that:
+      - verify.host.primary_name == host_before.host.primary_name

@@ -1,0 +1,57 @@
+---
+# Integration test: mipsou.freebox.lcd
+# Reads current brightness, sets it to the same (noop), check_mode changes it,
+# then restores original. Safe — no permanent change.
+
+- name: read current lcd config
+  mipsou.freebox.lcd:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: lcd_before
+
+- name: assert config returned
+  ansible.builtin.assert:
+    that:
+      - lcd_before.config is defined
+      - lcd_before.changed is false
+      - lcd_before.config.brightness is defined
+
+- name: set brightness to current value — noop
+  mipsou.freebox.lcd:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    brightness: "{{ lcd_before.config.brightness }}"
+  register: noop_result
+
+- name: assert noop
+  ansible.builtin.assert:
+    that:
+      - noop_result.changed is false
+
+- name: change brightness — check_mode only
+  mipsou.freebox.lcd:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    brightness: "{{ (lcd_before.config.brightness | int + 1) % 101 }}"
+  check_mode: true
+  register: check_result
+
+- name: assert check_mode changed
+  ansible.builtin.assert:
+    that:
+      - check_result.changed is true
+
+- name: verify brightness not changed after check_mode
+  mipsou.freebox.lcd:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+  register: verify
+
+- name: assert brightness unchanged
+  ansible.builtin.assert:
+    that:
+      - verify.config.brightness == lcd_before.config.brightness

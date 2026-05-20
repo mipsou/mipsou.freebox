@@ -18,3 +18,4 @@ tests/output/
 # the public collection (excluded from `ansible-galaxy collection build` via
 # `build_ignore` in galaxy.yml).
 HANDOFF.md
+tests/integration/integration_config.yml
