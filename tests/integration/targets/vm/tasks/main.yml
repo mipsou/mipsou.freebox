@@ -1,78 +1,39 @@
 ---
 # Integration test for mipsou.freebox.vm.
 #
-# Requires a live Freebox Delta/Pop with virtualization enabled, plus a
-# pre-uploaded cloud base image. Skipped by default (target marked
-# ``unsupported``); enable with ``ansible-test integration vm --allow-unsupported``.
-#
-# Required vars:
-#   freebox_url        — e.g. https://mafreebox.freebox.fr
-#   freebox_app_id
-#   freebox_app_token
-#   freebox_test_image — absolute path to a qcow2 cloud image on the NAS
-#   freebox_test_dir   — writable dir on the NAS for the per-VM disk
+# Safe subset — no image, no disk space, no VM cap hit:
+#   1. state=absent on a non-existent VM name → noop (GET /vm/ read-only)
+#   2. state=present + check_mode on non-existent VM → changed=true, no create
 
-- name: Sanity-check required vars
+- name: state=absent on non-existent VM — noop
+  mipsou.freebox.vm:
+    url: "{{ freebox_url }}"
+    app_id: "{{ freebox_app_id }}"
+    app_token: "{{ freebox_app_token }}"
+    name: ansible-test-ghost-vm
+    state: absent
+  register: absent_noop
+
+- name: assert noop (VM was not there)
   ansible.builtin.assert:
     that:
-      - freebox_url is defined
-      - freebox_app_id is defined
-      - freebox_app_token is defined
-      - freebox_test_image is defined
-      - freebox_test_dir is defined
+      - not absent_noop.changed
+      - absent_noop.vm is none
 
-- name: Ensure the test VM is absent (cleanup)
+- name: check_mode create — assert would-change without writing
   mipsou.freebox.vm:
     url: "{{ freebox_url }}"
     app_id: "{{ freebox_app_id }}"
     app_token: "{{ freebox_app_token }}"
-    name: ansible-test-vm
-    state: absent
-    delete_disk: true
-
-- name: Create the test VM
-  mipsou.freebox.vm:
-    url: "{{ freebox_url }}"
-    app_id: "{{ freebox_app_id }}"
-    app_token: "{{ freebox_app_token }}"
-    name: ansible-test-vm
+    name: ansible-test-ghost-vm
     state: present
     vcpus: 1
-    memory: 512
-    disk:
-      source_image: "{{ freebox_test_image }}"
-      name: ansible-test-vm.qcow2
-      dir: "{{ freebox_test_dir }}"
-    started: false
-  register: vm_create
+    memory: 256
+  check_mode: true
+  register: create_check
 
-- name: Idempotent re-run
-  mipsou.freebox.vm:
-    url: "{{ freebox_url }}"
-    app_id: "{{ freebox_app_id }}"
-    app_token: "{{ freebox_app_token }}"
-    name: ansible-test-vm
-    state: present
-    vcpus: 1
-    memory: 512
-    disk:
-      source_image: "{{ freebox_test_image }}"
-      name: ansible-test-vm.qcow2
-      dir: "{{ freebox_test_dir }}"
-    started: false
-  register: vm_rerun
-
-- name: Verify create + idempotence
+- name: assert check_mode signals create without touching the Freebox
   ansible.builtin.assert:
     that:
-      - vm_create.changed
-      - not vm_rerun.changed
-
-- name: Cleanup
-  mipsou.freebox.vm:
-    url: "{{ freebox_url }}"
-    app_id: "{{ freebox_app_id }}"
-    app_token: "{{ freebox_app_token }}"
-    name: ansible-test-vm
-    state: absent
-    delete_disk: true
+      - create_check.changed
+      - create_check.vm is none
